@@ -76,6 +76,14 @@ export default function App() {
     }
   };
 
+  // Handler Hapus Transaksi dengan Konfirmasi
+  const handleDelete = (id, txName) => {
+    const isConfirmed = window.confirm(`Apakah Anda yakin ingin menghapus transaksi "${txName}"?`);
+    if (isConfirmed) {
+      removeTx(id);
+    }
+  };
+
   // Handler Tombol Keluar
   const handleLogout = () => {
     if (window.confirm('Apakah Anda yakin ingin keluar dari aplikasi NusaKas?')) {
@@ -333,8 +341,9 @@ export default function App() {
                               </td>
                               <td className="py-3 text-right">
                                 <button 
-                                  onClick={() => removeTx(item.id)}
+                                  onClick={() => handleDelete(item.id, item.name)}
                                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                                  title="Hapus Transaksi"
                                 >
                                   <Trash2 size={16} />
                                 </button>
