@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Receipt, 
   Plus, Trash2, LogOut, Search,
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight,
-  Bot, Sparkles, Loader2, Send, Target, Lightbulb, RefreshCw
+  Bot, Sparkles, Loader2, Send, Target, Lightbulb, MessageSquarePlus, MessageSquare
 } from 'lucide-react';
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
@@ -36,26 +36,41 @@ export default function App() {
   const [targetResult, setTargetResult] = useState('');
   const [isCalculatingTarget, setIsCalculatingTarget] = useState(false);
 
-  // State Chatbot (Nusa) dengan Persistent Storage (localStorage)
-  const [messages, setMessages] = useState(() => {
-    const savedChat = localStorage.getItem('nusakas_chat_history');
-    return savedChat ? JSON.parse(savedChat) : [
-      { 
-        sender: 'nusa', 
-        text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' 
+  // -------------------------------------------------------------
+  // STATE MANAGEMENT MULTI-SESSION CHATBOT (NUSA) WITH LOCALSTORAGE
+  // -------------------------------------------------------------
+  const [chatSessions, setChatSessions] = useState(() => {
+    const savedSessions = localStorage.getItem('nusakas_chat_sessions');
+    if (savedSessions) {
+      try { 
+        const parsed = JSON.parse(savedSessions);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { 
+        console.error("Gagal memuat riwayat sesi chat:", e); 
       }
-    ];
+    }
+    const defaultId = Date.now().toString();
+    return [{
+      id: defaultId,
+      title: 'Percakapan Baru',
+      messages: [{ sender: 'nusa', text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' }]
+    }];
   });
-  
+
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    return chatSessions[0]?.id || Date.now().toString();
+  });
+
   const [inputChat, setInputChat] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef(null);
-
-  // Ref untuk menyimpan instance Sesi Chat Gemini (Bikin respon super cepat)
   const chatSessionRef = useRef(null);
 
   // State Errors Form
   const [errors, setErrors] = useState({});
+
+  // Sesi Chat Aktif Saat Ini
+  const currentSession = chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
 
   // Hitung Arus Kas
   const totalIncome = transactions
@@ -75,22 +90,22 @@ export default function App() {
     return matchesSearch && matchesType;
   });
 
-  // Simpan riwayat chat ke localStorage setiap kali pesan bertambah & Auto Scroll
+  // Simpan seluruh daftar sesi chat ke localStorage & Auto Scroll
   useEffect(() => {
-    localStorage.setItem('nusakas_chat_history', JSON.stringify(messages));
+    localStorage.setItem('nusakas_chat_sessions', JSON.stringify(chatSessions));
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [chatSessions, activeSessionId]);
 
-  // Inisialisasi Sesi Chat Gemini (startChat) saat komponen dimuat
+  // Inisialisasi/Reset Instance Gemini SDK startChat saat berpindah sesi
   useEffect(() => {
+    if (!currentSession) return;
     try {
       const model = genAI.getGenerativeModel({ 
         model: 'gemini-3.6-flash',
         systemInstruction: `Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.`
       });
 
-      // Format riwayat chat lama ke format SDK Gemini
-      const formattedHistory = messages
+      const formattedHistory = currentSession.messages
         .filter((_, index) => index > 0)
         .map(msg => ({
           role: msg.sender === 'user' ? 'user' : 'model',
@@ -101,16 +116,56 @@ export default function App() {
     } catch (err) {
       console.error("Gagal inisialisasi sesi chat Nusa:", err);
     }
-  }, []);
+  }, [activeSessionId]);
 
-  // FITUR AI 1: Send Message Chatbot Nusa (Fast Response)
+  // Buat Sesi Chat Baru
+  const handleCreateNewChat = () => {
+    const newId = Date.now().toString();
+    const newSession = {
+      id: newId,
+      title: 'Percakapan Baru',
+      messages: [{ sender: 'nusa', text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' }]
+    };
+    setChatSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newId);
+  };
+
+  // Hapus Sesi Chat
+  const handleDeleteSession = (id, e) => {
+    e.stopPropagation();
+    if (chatSessions.length === 1) {
+      handleCreateNewChat();
+      return;
+    }
+    const updated = chatSessions.filter(s => s.id !== id);
+    setChatSessions(updated);
+    if (activeSessionId === id) {
+      setActiveSessionId(updated[0].id);
+    }
+  };
+
+  // Kirim Pesan pada Sesi Aktif
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputChat.trim() || isChatLoading) return;
 
     const userText = inputChat;
     setInputChat('');
-    setMessages((prev) => [...prev, { sender: 'user', text: userText }]);
+
+    // Update pesan & judul percakapan jika ini pesan pertama pengguna
+    setChatSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        const isFirstUserMsg = s.messages.filter(m => m.sender === 'user').length === 0;
+        const newTitle = isFirstUserMsg ? (userText.length > 22 ? userText.substring(0, 22) + '...' : userText) : s.title;
+        return {
+          ...s,
+          title: newTitle,
+          messages: [...s.messages, { sender: 'user', text: userText }]
+        };
+      }
+      return s;
+    }));
+
     setIsChatLoading(true);
 
     try {
@@ -119,31 +174,26 @@ export default function App() {
         chatSessionRef.current = model.startChat();
       }
 
-      // Kirim konteks transaksi singkat bersama pesan pengguna
-      const promptWithContext = `[Konteks Kas Toko -> Pemasukan: Rp${totalIncome}, Pengeluaran: Rp${totalExpense}, Profit Net: Rp${netProfit}]\nPertanyaan Pengguna: ${userText}`;
-      
+      const promptWithContext = `[Kas Toko -> Income: Rp${totalIncome}, Expense: Rp${totalExpense}, Profit: Rp${netProfit}]\nPertanyaan: ${userText}`;
       const result = await chatSessionRef.current.sendMessage(promptWithContext);
-      setMessages((prev) => [...prev, { sender: 'nusa', text: result.response.text() }]);
+      const responseText = result.response.text();
+
+      setChatSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return { ...s, messages: [...s.messages, { sender: 'nusa', text: responseText }] };
+        }
+        return s;
+      }));
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [...prev, { sender: 'nusa', text: 'Maaf, sambungan Nusa terputus. Coba tanyakan lagi!' }]);
+      setChatSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return { ...s, messages: [...s.messages, { sender: 'nusa', text: 'Maaf, sambungan Nusa terputus. Coba tanyakan lagi!' }] };
+        }
+        return s;
+      }));
     } finally {
       setIsChatLoading(false);
-    }
-  };
-
-  // Hapus Riwayat Chat
-  const handleClearChat = () => {
-    if (window.confirm('Hapus semua riwayat chat dengan Nusa?')) {
-      const defaultMsg = [{ 
-        sender: 'nusa', 
-        text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' 
-      }];
-      setMessages(defaultMsg);
-      localStorage.removeItem('nusakas_chat_history');
-      
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-      chatSessionRef.current = model.startChat();
     }
   };
 
@@ -244,7 +294,7 @@ export default function App() {
     if (window.confirm('Keluar dari NusaKas?')) { window.location.reload(); }
   };
 
-  // Komponen khusus pemicu kustom visual Markdown
+  // Kustom visual Markdown
   const markdownComponents = {
     h1: ({node, ...props}) => <h1 className="text-sm font-bold text-slate-900 mt-2 mb-1" {...props} />,
     h2: ({node, ...props}) => <h2 className="text-xs font-bold text-slate-900 mt-2 mb-1" {...props} />,
@@ -263,7 +313,7 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans text-slate-800">
       
-      {/* SIDEBAR */}
+      {/* SIDEBAR UTAMA */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-5 shrink-0 h-full">
         <div>
           <div className="flex items-center gap-3 px-1 mb-8">
@@ -577,9 +627,9 @@ export default function App() {
           </div>
         )}
 
-        {/* TAMPILAN AI ADVISOR (TANYA NUSA) */}
+        {/* TAMPILAN AI ADVISOR (TANYA NUSA WITH MULTI-SESSION CHAT) */}
         {activeTab === 'ai-advisor' && (
-          <div className="max-w-5xl space-y-8">
+          <div className="max-w-6xl space-y-6">
             <header className="flex items-center gap-3">
               <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
                 <Bot size={28} />
@@ -592,30 +642,63 @@ export default function App() {
               </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* INTERACTIVE CHATBOT (NUSA) */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-[530px]">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="font-bold text-sm text-slate-800">NusaBot Chat</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      type="button" 
-                      onClick={handleClearChat}
-                      className="text-[11px] text-slate-400 hover:text-rose-500 font-semibold transition px-2 py-1 rounded-md hover:bg-rose-50"
-                    >
-                      Hapus Chat
-                    </button>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">Online</span>
-                  </div>
+              {/* SIDEBAR RIWAYAT CHAT (SESI CHAT) */}
+              <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden h-[530px]">
+                <div className="p-3 border-b border-slate-100">
+                  <button 
+                    onClick={handleCreateNewChat}
+                    className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition"
+                  >
+                    <MessageSquarePlus size={16} /> Chat Baru
+                  </button>
                 </div>
 
-                {/* CONTAINER MESAGE LIST */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Riwayat Chat</p>
+                  {chatSessions.map((session) => (
+                    <div 
+                      key={session.id}
+                      onClick={() => setActiveSessionId(session.id)}
+                      className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs transition ${
+                        session.id === activeSessionId 
+                          ? 'bg-emerald-50 text-emerald-700 font-bold' 
+                          : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <MessageSquare size={14} className="shrink-0 text-slate-400 group-hover:text-emerald-600" />
+                        <span className="truncate">{session.title}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded transition"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CHATBOT BOX UTAMA */}
+              <div className="lg:col-span-9 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-[530px] overflow-hidden">
+                <div className="p-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span className="font-bold text-xs text-slate-800 truncate max-w-xs">
+                      {currentSession?.title}
+                    </span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">
+                    Gemini 3.6 Flash
+                  </span>
+                </div>
+
+                {/* DAFTAR PESAN CHAT */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {messages.map((msg, idx) => (
+                  {currentSession?.messages.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
                         msg.sender === 'user' 
@@ -637,12 +720,12 @@ export default function App() {
                 </div>
 
                 {/* FORM INPUT CHAT */}
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2">
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2 bg-white">
                   <input 
                     type="text" 
                     value={inputChat}
                     onChange={(e) => setInputChat(e.target.value)}
-                    placeholder="Tanya Nusa (misal: kasih ide promo harian)..."
+                    placeholder="Tanya Nusa tentang keuangan toko..."
                     className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   <button 
@@ -655,70 +738,70 @@ export default function App() {
                 </form>
               </div>
 
-              {/* FITUR SAMPINGAN (KALKULATOR & AUDIT) */}
-              <div className="space-y-6">
-                
-                {/* KALKULATOR TARGET OMZET */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3 text-emerald-600">
-                    <Target size={20} />
-                    <h2 className="font-bold text-slate-900 text-base">Kalkulator Target Keuntungan</h2>
+            </div>
+
+            {/* BARIS UTILITAS FITUR AI (KALKULATOR & AUDIT) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+              
+              {/* KALKULATOR TARGET OMZET */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                <div className="flex items-center gap-2 mb-3 text-emerald-600">
+                  <Target size={20} />
+                  <h2 className="font-bold text-slate-900 text-base">Kalkulator Target Keuntungan</h2>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">
+                  Masukkan target laba bersih toko kamu, Nusa akan meracik strategi penjualannya!
+                </p>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <input 
+                    type="number"
+                    value={targetAmount}
+                    onChange={(e) => setTargetAmount(e.target.value)}
+                    placeholder="Masukkan nominal target"
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <button 
+                    onClick={handleCalculateTarget}
+                    disabled={isCalculatingTarget || !targetAmount}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition disabled:opacity-50"
+                  >
+                    {isCalculatingTarget ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Hitung Target
+                  </button>
+                </div>
+
+                {targetResult && (
+                  <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-xs text-slate-700 leading-relaxed">
+                    <ReactMarkdown components={markdownComponents}>{targetResult}</ReactMarkdown>
                   </div>
-                  <p className="text-xs text-slate-400 mb-4">
-                    Masukkan target laba bersih toko kamu, Nusa akan meracik strategi penjualannya!
+                )}
+              </div>
+
+              {/* AUDIT LAPORAN KAS */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 text-emerald-600">
+                    <Lightbulb size={20} />
+                    <h2 className="font-bold text-slate-900 text-base">Audit Laporan Kas</h2>
+                  </div>
+                  <button 
+                    onClick={handleAnalyzeCashflow}
+                    disabled={isAnalyzing || transactions.length === 0}
+                    className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition disabled:opacity-50"
+                  >
+                    {isAnalyzing ? 'Menganalisis...' : 'Audit Otomatis'}
+                  </button>
+                </div>
+
+                {aiAnalysis ? (
+                  <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto">
+                    <ReactMarkdown components={markdownComponents}>{aiAnalysis}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 text-center py-4">
+                    Klik "Audit Otomatis" untuk ringkasan performa keuangan lengkap.
                   </p>
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <input 
-                      type="number"
-                      value={targetAmount}
-                      onChange={(e) => setTargetAmount(e.target.value)}
-                      placeholder="Masukkan nominal target"
-                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    />
-                    <button 
-                      onClick={handleCalculateTarget}
-                      disabled={isCalculatingTarget || !targetAmount}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition disabled:opacity-50"
-                    >
-                      {isCalculatingTarget ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Hitung Target
-                    </button>
-                  </div>
-
-                  {targetResult && (
-                    <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-xs text-slate-700 leading-relaxed">
-                      <ReactMarkdown components={markdownComponents}>{targetResult}</ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-
-                {/* AUDIT LAPORAN KAS */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-emerald-600">
-                      <Lightbulb size={20} />
-                      <h2 className="font-bold text-slate-900 text-base">Audit Laporan Kas</h2>
-                    </div>
-                    <button 
-                      onClick={handleAnalyzeCashflow}
-                      disabled={isAnalyzing || transactions.length === 0}
-                      className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition disabled:opacity-50"
-                    >
-                      {isAnalyzing ? 'Menganalisis...' : 'Audit Otomatis'}
-                    </button>
-                  </div>
-
-                  {aiAnalysis ? (
-                    <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto">
-                      <ReactMarkdown components={markdownComponents}>{aiAnalysis}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 text-center py-4">
-                      Klik "Audit Otomatis" untuk ringkasan performa keuangan lengkap.
-                    </p>
-                  )}
-                </div>
-
+                )}
               </div>
 
             </div>
