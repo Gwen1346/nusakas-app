@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import React, { useState, useRef, useEffect } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import ReactMarkdown from 'react-markdown';
 import { useTransactions } from './hooks/useTransactions';
 import { transactionSchema } from './schemas/transactionSchema';
@@ -7,10 +7,10 @@ import {
   LayoutDashboard, Receipt, 
   Plus, Trash2, LogOut, Search,
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight,
-  Bot, Sparkles, Loader2
+  Bot, Sparkles, Loader2, Send, Target, Lightbulb, RefreshCw
 } from 'lucide-react';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
 export default function App() {
   const { transactions, loading, addTx, removeTx } = useTransactions();
@@ -29,20 +29,35 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
 
-  // State AI Advisor
+  // State AI Features
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [targetAmount, setTargetAmount] = useState('1000000');
+  const [targetResult, setTargetResult] = useState('');
+  const [isCalculatingTarget, setIsCalculatingTarget] = useState(false);
 
-  // State Errors
+  // State Chatbot (Nusa) dengan Persistent Storage (localStorage)
+  const [messages, setMessages] = useState(() => {
+    const savedChat = localStorage.getItem('nusakas_chat_history');
+    return savedChat ? JSON.parse(savedChat) : [
+      { 
+        sender: 'nusa', 
+        text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' 
+      }
+    ];
+  });
+  
+  const [inputChat, setInputChat] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
+  // Ref untuk menyimpan instance Sesi Chat Gemini (Bikin respon super cepat)
+  const chatSessionRef = useRef(null);
+
+  // State Errors Form
   const [errors, setErrors] = useState({});
 
-  const filteredTransactions = transactions.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'ALL' || item.type === filterType;
-    return matchesSearch && matchesType;
-  });
-
+  // Hitung Arus Kas
   const totalIncome = transactions
     .filter((t) => t.type === 'INCOME')
     .reduce((acc, curr) => acc + Number(curr.price) * (curr.qty || 1), 0);
@@ -53,106 +68,196 @@ export default function App() {
 
   const netProfit = totalIncome - totalExpense;
 
-  // FITUR AI 1: Auto Categorize
+  const filteredTransactions = transactions.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'ALL' || item.type === filterType;
+    return matchesSearch && matchesType;
+  });
+
+  // Simpan riwayat chat ke localStorage setiap kali pesan bertambah & Auto Scroll
+  useEffect(() => {
+    localStorage.setItem('nusakas_chat_history', JSON.stringify(messages));
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Inisialisasi Sesi Chat Gemini (startChat) saat komponen dimuat
+  useEffect(() => {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: 'gemini-3.6-flash',
+        systemInstruction: `Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.`
+      });
+
+      // Format riwayat chat lama ke format SDK Gemini
+      const formattedHistory = messages
+        .filter((_, index) => index > 0)
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        }));
+
+      chatSessionRef.current = model.startChat({ history: formattedHistory });
+    } catch (err) {
+      console.error("Gagal inisialisasi sesi chat Nusa:", err);
+    }
+  }, []);
+
+  // FITUR AI 1: Send Message Chatbot Nusa (Fast Response)
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!inputChat.trim() || isChatLoading) return;
+
+    const userText = inputChat;
+    setInputChat('');
+    setMessages((prev) => [...prev, { sender: 'user', text: userText }]);
+    setIsChatLoading(true);
+
+    try {
+      if (!chatSessionRef.current) {
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+        chatSessionRef.current = model.startChat();
+      }
+
+      // Kirim konteks transaksi singkat bersama pesan pengguna
+      const promptWithContext = `[Konteks Kas Toko -> Pemasukan: Rp${totalIncome}, Pengeluaran: Rp${totalExpense}, Profit Net: Rp${netProfit}]\nPertanyaan Pengguna: ${userText}`;
+      
+      const result = await chatSessionRef.current.sendMessage(promptWithContext);
+      setMessages((prev) => [...prev, { sender: 'nusa', text: result.response.text() }]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [...prev, { sender: 'nusa', text: 'Maaf, sambungan Nusa terputus. Coba tanyakan lagi!' }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  // Hapus Riwayat Chat
+  const handleClearChat = () => {
+    if (window.confirm('Hapus semua riwayat chat dengan Nusa?')) {
+      const defaultMsg = [{ 
+        sender: 'nusa', 
+        text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' 
+      }];
+      setMessages(defaultMsg);
+      localStorage.removeItem('nusakas_chat_history');
+      
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      chatSessionRef.current = model.startChat();
+    }
+  };
+
+  // FITUR AI 2: Auto Categorize Input Transaksi
   const handleAutoCategorize = async () => {
     if (!name.trim()) return;
     setIsAiCategorizing(true);
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Analisis transaksi kasir berikut: "${name}". 
-        Tentukan TIPE ("INCOME" atau "EXPENSE") dan KATEGORI (Pilih salah satu: "Minuman", "Makanan", "Bahan Baku", "Operasional").
-        Berikan respon HANYA dalam format JSON valid tanpa markdown, contoh: {"type": "EXPENSE", "category": "Bahan Baku"}`,
-      });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      const prompt = `Analisis nama transaksi ini: "${name}". 
+      Tentukan TIPE ("INCOME" atau "EXPENSE") dan KATEGORI (Pilih salah satu: "Minuman", "Makanan", "Bahan Baku", "Operasional").
+      Hanya berikan JSON valid tanpa markdown, contoh: {"type": "EXPENSE", "category": "Bahan Baku"}`;
 
-      const cleanJson = response.text.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(cleanJson);
+      const result = await model.generateContent(prompt);
+      const cleanJson = result.response.text().replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
       
-      if (result.type) setType(result.type);
-      if (result.category) setCategory(result.category);
+      if (parsed.type) setType(parsed.type);
+      if (parsed.category) setCategory(parsed.category);
     } catch (err) {
-      console.error("Gagal melakukan kategorisasi AI:", err);
+      console.error("Gagal auto categorize:", err);
     } finally {
       setIsAiCategorizing(false);
     }
   };
 
-  // FITUR AI 2: Analisis Cashflow
+  // FITUR AI 3: Audit Laporan Kas
   const handleAnalyzeCashflow = async () => {
     setIsAnalyzing(true);
     setAiAnalysis('');
     try {
-      const promptData = {
-        totalIncome,
-        totalExpense,
-        netProfit,
-        transactionCount: transactions.length,
-        recentTransactions: transactions.slice(-10),
-      };
+      const promptData = { totalIncome, totalExpense, netProfit, transactionCount: transactions.length, recentTransactions: transactions.slice(-10) };
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      const prompt = `Kamu adalah Nusa, Konsultan Keuangan UMKM POS NusaKas.
+      Analisis data kas berikut: ${JSON.stringify(promptData, null, 2)}
+      Berikan ringkasan audit singkat meliputi:
+      - Status Kesehatan Kas
+      - Potensi Pemborosan / Pengeluaran Terbesar
+      - 2 Saran Aksi Cepat Minggu Ini`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Kamu adalah Konsultan Keuangan UMKM profesional untuk aplikasi NusaKas.
-        Berikut adalah data keuangan toko saat ini:
-        ${JSON.stringify(promptData, null, 2)}
-
-        Berikan analisis singkat, padat, dan praktis dalam format poin-poin:
-        1. Evaluasi Kesehatan Kas (Profit/Defisit)
-        2. Analisis Potensi Pemborosan / Pengeluaran Terbesar
-        3. 2-3 Saran Strategi Bisnis Konkret untuk meningkatkan keuntungan minggu ini.
-        Gunakan bahasa Indonesia yang ramah dan suportif!`,
-      });
-
-      setAiAnalysis(response.text);
+      const result = await model.generateContent(prompt);
+      setAiAnalysis(result.response.text());
     } catch (err) {
-      setAiAnalysis("Gagal terhubung dengan NusaKas AI Advisor. Pastikan API Key valid.");
+      console.error(err);
+      setAiAnalysis("Gagal terhubung dengan Nusa. Coba lagi beberapa saat lagi.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // FITUR AI 4: Kalkulator Target Profit
+  const handleCalculateTarget = async () => {
+    if (!targetAmount) return;
+    setIsCalculatingTarget(true);
+    setTargetResult('');
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      const prompt = `Kamu adalah Nusa, asisten bisnis UMKM. 
+      Target Laba Bersih yang diinginkan: Rp ${Number(targetAmount).toLocaleString('id-ID')}.
+      Data Kas Toko: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}.
+      
+      Berikan estimasi ringkas (maksimal 3 poin):
+      - Estimasi porsi/cup terjual per hari.
+      - Rekomendasi strategi bundling/promo cepat.`;
+
+      const result = await model.generateContent(prompt);
+      setTargetResult(result.response.text());
+    } catch (err) {
+      console.error(err);
+      setTargetResult("Gagal menghitung target. Pastikan nominal angka valid.");
+    } finally {
+      setIsCalculatingTarget(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const formData = {
-      name,
-      price: price === '' ? NaN : Number(price),
-      type,
-      category,
-    };
-
+    const formData = { name, price: price === '' ? NaN : Number(price), type, category };
     const validationResult = transactionSchema.safeParse(formData);
 
     if (!validationResult.success) {
       const formattedErrors = {};
-      validationResult.error.issues.forEach((issue) => {
-        formattedErrors[issue.path[0]] = issue.message;
-      });
+      validationResult.error.issues.forEach((issue) => { formattedErrors[issue.path[0]] = issue.message; });
       setErrors(formattedErrors);
       return;
     }
 
     setErrors({});
     const success = await addTx({ ...formData, qty: 1 });
-
-    if (success) {
-      setName('');
-      setPrice('');
-    }
+    if (success) { setName(''); setPrice(''); }
   };
 
   const handleDelete = (id, txName) => {
-    const isConfirmed = window.confirm(`Apakah Anda yakin ingin menghapus transaksi "${txName}"?`);
-    if (isConfirmed) {
-      removeTx(id);
-    }
+    if (window.confirm(`Hapus transaksi "${txName}"?`)) removeTx(id);
   };
 
   const handleLogout = () => {
-    if (window.confirm('Apakah Anda yakin ingin keluar dari aplikasi NusaKas?')) {
-      alert('Sesi Anda telah berakhir.');
-      window.location.reload();
-    }
+    if (window.confirm('Keluar dari NusaKas?')) { window.location.reload(); }
+  };
+
+  // Komponen khusus pemicu kustom visual Markdown
+  const markdownComponents = {
+    h1: ({node, ...props}) => <h1 className="text-sm font-bold text-slate-900 mt-2 mb-1" {...props} />,
+    h2: ({node, ...props}) => <h2 className="text-xs font-bold text-slate-900 mt-2 mb-1" {...props} />,
+    p: ({node, ...props}) => <p className="mb-1.5 last:mb-0" {...props} />,
+    ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-0.5" {...props} />,
+    ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-0.5" {...props} />,
+    li: ({node, ...props}) => <li className="pl-0.5" {...props} />,
+    strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />,
+    hr: ({node, ...props}) => <hr className="my-2 border-slate-200" {...props} />,
+    code: ({node, inline, ...props}) => 
+      inline 
+        ? <code className="bg-slate-200 px-1 py-0.5 rounded text-[11px] font-mono" {...props} />
+        : <code className="block bg-slate-800 text-emerald-400 p-2 rounded-lg text-[11px] font-mono overflow-x-auto my-2" {...props} />
   };
 
   return (
@@ -161,26 +266,16 @@ export default function App() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-5 shrink-0 h-full">
         <div>
-          {/* BRANDING LOGO */}
           <div className="flex items-center gap-3 px-1 mb-8">
-            <svg viewBox="0 0 400 400" className="w-10 h-10 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 400 400" className="w-10 h-10 shrink-0" fill="none">
               <defs>
                 <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#10B981" />
                   <stop offset="100%" stopColor="#047857" />
                 </linearGradient>
-                <linearGradient id="foldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#E6F4EA" />
-                  <stop offset="100%" stopColor="#A7F3D0" />
-                </linearGradient>
               </defs>
               <rect x="40" y="40" width="320" height="320" rx="80" fill="url(#bgGrad)" />
-              <g transform="translate(110, 110)">
-                <rect x="0" y="0" width="45" height="180" rx="22.5" fill="#FFFFFF" />
-                <path d="M 22.5 0 L 157.5 157.5 C 168 168 158 180 142 180 L 110 180 Z" fill="#FFFFFF" />
-                <rect x="125" y="45" width="45" height="135" rx="22.5" fill="#FFFFFF" />
-                <path d="M 125 45 C 125 15, 170 15, 170 45 L 170 110 C 170 125, 125 110, 125 90 Z" fill="url(#foldGrad)" />
-              </g>
+              <path d="M 130 110 L 270 270 M 270 110 L 130 270" stroke="#FFFFFF" strokeWidth="40" strokeLinecap="round" />
             </svg>
             <div>
               <div className="font-extrabold text-lg leading-none tracking-tight">
@@ -214,7 +309,7 @@ export default function App() {
                 activeTab === 'ai-advisor' ? 'bg-emerald-50 text-emerald-600 font-bold' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              <Bot size={18} className="text-emerald-600" /> AI Advisor <Sparkles size={14} className="text-amber-400" />
+              <Bot size={18} className="text-emerald-600" /> Tanya Nusa <Sparkles size={14} className="text-amber-400" />
             </button>
           </nav>
         </div>
@@ -239,7 +334,7 @@ export default function App() {
                 <p className="text-sm text-slate-400">Kelola arus kas & transaksi UMKM</p>
               </div>
               <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-bold">
-                ● Server Connected (Port 5000)
+                ● Server Connected
               </span>
             </header>
 
@@ -406,7 +501,6 @@ export default function App() {
                                 <button 
                                   onClick={() => handleDelete(item.id, item.name)}
                                   className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                                  title="Hapus Transaksi"
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -428,7 +522,7 @@ export default function App() {
           <div>
             <header className="mb-8">
               <h1 className="text-2xl font-bold text-slate-900">Laporan Kas & Keuangan</h1>
-              <p className="text-sm text-slate-400">Ringkasan rinci performa transaksi dan statistik toko</p>
+              <p className="text-sm text-slate-400">Ringkasan rinci performa transaksi toko</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -483,55 +577,150 @@ export default function App() {
           </div>
         )}
 
-        {/* TAMPILAN AI ADVISOR */}
+        {/* TAMPILAN AI ADVISOR (TANYA NUSA) */}
         {activeTab === 'ai-advisor' && (
-          <div className="max-w-4xl">
-            <header className="mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
-                  <Bot size={28} />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    NusaKas AI Advisor <Sparkles className="text-amber-400" size={20} />
-                  </h1>
-                  <p className="text-sm text-slate-400">Analisis otomatis performa kas & saran pertumbuhan bisnis UMKM</p>
-                </div>
+          <div className="max-w-5xl space-y-8">
+            <header className="flex items-center gap-3">
+              <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
+                <Bot size={28} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  Tanya Nusa <Sparkles className="text-amber-400" size={20} />
+                </h1>
+                <p className="text-sm text-slate-400">Asisten bisnis cerdas & kalkulator proyeksi keuangan toko</p>
               </div>
             </header>
 
-            <div className="bg-white p-8 rounded-2xl border border-slate-200/80 shadow-sm">
-              <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Analisis Keuangan Real-Time</h2>
-                  <p className="text-xs text-slate-400">AI akan membaca {transactions.length} data transaksi Anda saat ini.</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* INTERACTIVE CHATBOT (NUSA) */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-[530px]">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span className="font-bold text-sm text-slate-800">NusaBot Chat</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button" 
+                      onClick={handleClearChat}
+                      className="text-[11px] text-slate-400 hover:text-rose-500 font-semibold transition px-2 py-1 rounded-md hover:bg-rose-50"
+                    >
+                      Hapus Chat
+                    </button>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">Online</span>
+                  </div>
                 </div>
-                <button 
-                  onClick={handleAnalyzeCashflow}
-                  disabled={isAnalyzing || transactions.length === 0}
-                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm flex items-center gap-2 transition disabled:opacity-50"
-                >
-                  {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                  {isAnalyzing ? 'Menganalisis...' : 'Mulai Analisis AI'}
-                </button>
+
+                {/* CONTAINER MESAGE LIST */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                        msg.sender === 'user' 
+                          ? 'bg-emerald-600 text-white rounded-br-none font-medium' 
+                          : 'bg-slate-100 text-slate-800 rounded-bl-none'
+                      }`}>
+                        <ReactMarkdown components={markdownComponents}>{msg.text}</ReactMarkdown>
+                      </div>
+                    </div>
+                  ))}
+                  {isChatLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-slate-100 p-3 rounded-2xl rounded-bl-none text-xs text-slate-400 flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin text-emerald-600" /> Nusa sedang berpikir...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* FORM INPUT CHAT */}
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={inputChat}
+                    onChange={(e) => setInputChat(e.target.value)}
+                    placeholder="Tanya Nusa (misal: kasih ide promo harian)..."
+                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!inputChat.trim() || isChatLoading}
+                    className="p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition disabled:opacity-50 shrink-0"
+                  >
+                    <Send size={16} />
+                  </button>
+                </form>
               </div>
 
-              {aiAnalysis ? (
-                <div className={`p-6 rounded-xl border text-sm leading-relaxed max-w-none ${
-                  aiAnalysis.includes('Gagal') 
-                    ? 'bg-rose-50 border-rose-200 text-rose-700 font-medium' 
-                    : 'bg-emerald-50/50 border-emerald-100 text-slate-700 prose prose-emerald'
-                }`}>
-                  <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-slate-400">
-                  <Bot size={48} className="mx-auto mb-3 text-slate-300" />
-                  <p className="text-sm font-medium">
-                    Klik tombol <strong className="text-slate-700">"Mulai Analisis AI"</strong> untuk mendapatkan masukan strategi bisnis dari Gemini AI.
+              {/* FITUR SAMPINGAN (KALKULATOR & AUDIT) */}
+              <div className="space-y-6">
+                
+                {/* KALKULATOR TARGET OMZET */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3 text-emerald-600">
+                    <Target size={20} />
+                    <h2 className="font-bold text-slate-900 text-base">Kalkulator Target Keuntungan</h2>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Masukkan target laba bersih toko kamu, Nusa akan meracik strategi penjualannya!
                   </p>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <input 
+                      type="number"
+                      value={targetAmount}
+                      onChange={(e) => setTargetAmount(e.target.value)}
+                      placeholder="Masukkan nominal target"
+                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                    <button 
+                      onClick={handleCalculateTarget}
+                      disabled={isCalculatingTarget || !targetAmount}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition disabled:opacity-50"
+                    >
+                      {isCalculatingTarget ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Hitung Target
+                    </button>
+                  </div>
+
+                  {targetResult && (
+                    <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-xs text-slate-700 leading-relaxed">
+                      <ReactMarkdown components={markdownComponents}>{targetResult}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* AUDIT LAPORAN KAS */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-emerald-600">
+                      <Lightbulb size={20} />
+                      <h2 className="font-bold text-slate-900 text-base">Audit Laporan Kas</h2>
+                    </div>
+                    <button 
+                      onClick={handleAnalyzeCashflow}
+                      disabled={isAnalyzing || transactions.length === 0}
+                      className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition disabled:opacity-50"
+                    >
+                      {isAnalyzing ? 'Menganalisis...' : 'Audit Otomatis'}
+                    </button>
+                  </div>
+
+                  {aiAnalysis ? (
+                    <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto">
+                      <ReactMarkdown components={markdownComponents}>{aiAnalysis}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      Klik "Audit Otomatis" untuk ringkasan performa keuangan lengkap.
+                    </p>
+                  )}
+                </div>
+
+              </div>
+
             </div>
           </div>
         )}
