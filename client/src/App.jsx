@@ -280,21 +280,20 @@ export default function App() {
         : <code className="block bg-slate-800 text-emerald-400 p-2 rounded-lg text-[11px] font-mono overflow-x-auto my-2" {...props} />
   };
 
+  // Komponen Logo Huruf N Modern
+  const logoSvg = (
+    <svg viewBox="0 0 400 400" className="w-9 h-9 shrink-0" fill="none">
+      <rect x="40" y="40" width="320" height="320" rx="80" fill="#10B981" />
+      <path d="M 130 270 L 130 130 L 175 130 L 225 210 L 225 130 L 270 130 L 270 270 L 225 270 L 175 190 L 175 270 Z" fill="#FFFFFF" />
+    </svg>
+  );
+
   const sidebarContent = (
     <div className="flex flex-col justify-between h-full p-5 bg-white">
       <div>
         <div className="flex items-center justify-between px-1 mb-8">
           <div className="flex items-center gap-3">
-            <svg viewBox="0 0 400 400" className="w-9 h-9 shrink-0" fill="none">
-              <defs>
-                <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#10B981" />
-                  <stop offset="100%" stopColor="#047857" />
-                </linearGradient>
-              </defs>
-              <rect x="40" y="40" width="320" height="320" rx="80" fill="url(#bgGrad)" />
-              <path d="M 130 110 L 270 270 M 270 110 L 130 270" stroke="#FFFFFF" strokeWidth="40" strokeLinecap="round" />
-            </svg>
+            {logoSvg}
             <div className="flex flex-col justify-center">
               <div className="font-extrabold text-base leading-tight tracking-tight">
                 <span className="text-[#064E3B]">Nusa</span>
@@ -373,10 +372,7 @@ export default function App() {
         {/* MOBILE TOPBAR (Tombol Hamburger & Logo Rapi) */}
         <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2.5">
-            <svg viewBox="0 0 400 400" className="w-8 h-8 shrink-0" fill="none">
-              <rect x="40" y="40" width="320" height="320" rx="80" fill="#10B981" />
-              <path d="M 130 110 L 270 270 M 270 110 L 130 270" stroke="#FFFFFF" strokeWidth="40" strokeLinecap="round" />
-            </svg>
+            {logoSvg}
             <div className="flex flex-col justify-center">
               <span className="font-extrabold text-sm leading-tight tracking-tight">
                 <span className="text-[#064E3B]">Nusa</span>
