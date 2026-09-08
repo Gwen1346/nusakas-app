@@ -1,32 +1,41 @@
 import React, { useState } from 'react';
+import { GoogleGenAI } from '@google/genai';
+import ReactMarkdown from 'react-markdown';
 import { useTransactions } from './hooks/useTransactions';
 import { transactionSchema } from './schemas/transactionSchema';
 import { 
   LayoutDashboard, Receipt, 
   Plus, Trash2, LogOut, Search,
-  TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight
+  TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight,
+  Bot, Sparkles, Loader2
 } from 'lucide-react';
+
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
 
 export default function App() {
   const { transactions, loading, addTx, removeTx } = useTransactions();
 
-  // State Halaman Active ('dashboard' | 'laporan')
+  // State Navigation
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // State Form Transaksi
+  // State Form
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [type, setType] = useState('INCOME');
   const [category, setCategory] = useState('Minuman');
+  const [isAiCategorizing, setIsAiCategorizing] = useState(false);
   
   // State Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
 
-  // State Error Validasi Zod
+  // State AI Advisor
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // State Errors
   const [errors, setErrors] = useState({});
 
-  // Filter Data Transaksi berdasarkan Search & Tipe
   const filteredTransactions = transactions.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.category.toLowerCase().includes(searchTerm.toLowerCase());
@@ -34,7 +43,6 @@ export default function App() {
     return matchesSearch && matchesType;
   });
 
-  // Ringkasan Keuangan
   const totalIncome = transactions
     .filter((t) => t.type === 'INCOME')
     .reduce((acc, curr) => acc + Number(curr.price) * (curr.qty || 1), 0);
@@ -45,7 +53,64 @@ export default function App() {
 
   const netProfit = totalIncome - totalExpense;
 
-  // Handler Submit dengan Validasi Zod
+  // FITUR AI 1: Auto Categorize
+  const handleAutoCategorize = async () => {
+    if (!name.trim()) return;
+    setIsAiCategorizing(true);
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Analisis transaksi kasir berikut: "${name}". 
+        Tentukan TIPE ("INCOME" atau "EXPENSE") dan KATEGORI (Pilih salah satu: "Minuman", "Makanan", "Bahan Baku", "Operasional").
+        Berikan respon HANYA dalam format JSON valid tanpa markdown, contoh: {"type": "EXPENSE", "category": "Bahan Baku"}`,
+      });
+
+      const cleanJson = response.text.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(cleanJson);
+      
+      if (result.type) setType(result.type);
+      if (result.category) setCategory(result.category);
+    } catch (err) {
+      console.error("Gagal melakukan kategorisasi AI:", err);
+    } finally {
+      setIsAiCategorizing(false);
+    }
+  };
+
+  // FITUR AI 2: Analisis Cashflow
+  const handleAnalyzeCashflow = async () => {
+    setIsAnalyzing(true);
+    setAiAnalysis('');
+    try {
+      const promptData = {
+        totalIncome,
+        totalExpense,
+        netProfit,
+        transactionCount: transactions.length,
+        recentTransactions: transactions.slice(-10),
+      };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Kamu adalah Konsultan Keuangan UMKM profesional untuk aplikasi NusaKas.
+        Berikut adalah data keuangan toko saat ini:
+        ${JSON.stringify(promptData, null, 2)}
+
+        Berikan analisis singkat, padat, dan praktis dalam format poin-poin:
+        1. Evaluasi Kesehatan Kas (Profit/Defisit)
+        2. Analisis Potensi Pemborosan / Pengeluaran Terbesar
+        3. 2-3 Saran Strategi Bisnis Konkret untuk meningkatkan keuntungan minggu ini.
+        Gunakan bahasa Indonesia yang ramah dan suportif!`,
+      });
+
+      setAiAnalysis(response.text);
+    } catch (err) {
+      setAiAnalysis("Gagal terhubung dengan NusaKas AI Advisor. Pastikan API Key valid.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -76,7 +141,6 @@ export default function App() {
     }
   };
 
-  // Handler Hapus Transaksi dengan Konfirmasi
   const handleDelete = (id, txName) => {
     const isConfirmed = window.confirm(`Apakah Anda yakin ingin menghapus transaksi "${txName}"?`);
     if (isConfirmed) {
@@ -84,7 +148,6 @@ export default function App() {
     }
   };
 
-  // Handler Tombol Keluar
   const handleLogout = () => {
     if (window.confirm('Apakah Anda yakin ingin keluar dari aplikasi NusaKas?')) {
       alert('Sesi Anda telah berakhir.');
@@ -93,10 +156,10 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans text-slate-800">
       
       {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-5">
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-5 shrink-0 h-full">
         <div>
           {/* BRANDING LOGO */}
           <div className="flex items-center gap-3 px-1 mb-8">
@@ -117,9 +180,6 @@ export default function App() {
                 <path d="M 22.5 0 L 157.5 157.5 C 168 168 158 180 142 180 L 110 180 Z" fill="#FFFFFF" />
                 <rect x="125" y="45" width="45" height="135" rx="22.5" fill="#FFFFFF" />
                 <path d="M 125 45 C 125 15, 170 15, 170 45 L 170 110 C 170 125, 125 110, 125 90 Z" fill="url(#foldGrad)" />
-                <line x1="137" y1="42" x2="158" y2="42" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
-                <line x1="137" y1="54" x2="158" y2="54" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
-                <line x1="137" y1="66" x2="151" y2="66" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
               </g>
             </svg>
             <div>
@@ -135,9 +195,7 @@ export default function App() {
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={`flex items-center gap-3 w-full px-4 py-3 font-semibold rounded-xl text-sm transition ${
-                activeTab === 'dashboard' 
-                  ? 'bg-emerald-50 text-emerald-600' 
-                  : 'text-slate-500 hover:bg-slate-50'
+                activeTab === 'dashboard' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
               <LayoutDashboard size={18} /> Dashboard
@@ -145,26 +203,32 @@ export default function App() {
             <button 
               onClick={() => setActiveTab('laporan')}
               className={`flex items-center gap-3 w-full px-4 py-3 font-semibold rounded-xl text-sm transition ${
-                activeTab === 'laporan' 
-                  ? 'bg-emerald-50 text-emerald-600' 
-                  : 'text-slate-500 hover:bg-slate-50'
+                activeTab === 'laporan' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
               <Receipt size={18} /> Laporan Kas
+            </button>
+            <button 
+              onClick={() => setActiveTab('ai-advisor')}
+              className={`flex items-center gap-3 w-full px-4 py-3 font-semibold rounded-xl text-sm transition ${
+                activeTab === 'ai-advisor' ? 'bg-emerald-50 text-emerald-600 font-bold' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Bot size={18} className="text-emerald-600" /> AI Advisor <Sparkles size={14} className="text-amber-400" />
             </button>
           </nav>
         </div>
 
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 text-rose-500 hover:bg-rose-50 font-semibold rounded-xl text-sm transition"
+          className="flex items-center gap-3 w-full px-4 py-3 text-rose-500 hover:bg-rose-50 font-semibold rounded-xl text-sm transition mt-auto"
         >
           <LogOut size={18} /> Keluar
         </button>
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="flex-1 overflow-y-auto p-8 h-full">
         
         {/* TAMPILAN DASHBOARD */}
         {activeTab === 'dashboard' && (
@@ -174,26 +238,19 @@ export default function App() {
                 <h1 className="text-2xl font-bold text-slate-900">Dashboard Kasir</h1>
                 <p className="text-sm text-slate-400">Kelola arus kas & transaksi UMKM</p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-bold">
-                  ● Server Connected (Port 5000)
-                </span>
-              </div>
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-bold">
+                ● Server Connected (Port 5000)
+              </span>
             </header>
 
-            {/* SUMMARY CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
                 <p className="text-xs font-bold text-slate-400 uppercase">Pemasukan</p>
-                <p className="text-2xl font-black text-emerald-600 mt-1">
-                  Rp {totalIncome.toLocaleString('id-ID')}
-                </p>
+                <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalIncome.toLocaleString('id-ID')}</p>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
                 <p className="text-xs font-bold text-slate-400 uppercase">Pengeluaran</p>
-                <p className="text-2xl font-black text-rose-600 mt-1">
-                  Rp {totalExpense.toLocaleString('id-ID')}
-                </p>
+                <p className="text-2xl font-black text-rose-600 mt-1">Rp {totalExpense.toLocaleString('id-ID')}</p>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
                 <p className="text-xs font-bold text-slate-400 uppercase">Net Profit</p>
@@ -203,12 +260,20 @@ export default function App() {
               </div>
             </div>
 
-            {/* FORM INPUT & TABEL */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              {/* FORM INPUT */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
-                <h2 className="text-base font-bold text-slate-900 mb-4">+ Tambah Transaksi</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold text-slate-900">+ Tambah Transaksi</h2>
+                  <button 
+                    type="button" 
+                    onClick={handleAutoCategorize}
+                    disabled={isAiCategorizing || !name}
+                    className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition disabled:opacity-50"
+                  >
+                    {isAiCategorizing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Auto-Fill
+                  </button>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Nama Transaksi</label>
@@ -216,7 +281,8 @@ export default function App() {
                       type="text" 
                       value={name} 
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Contoh: Kopi Susu Aren" 
+                      onBlur={handleAutoCategorize}
+                      placeholder="Contoh: Beli Kopi Arabika 1kg" 
                       className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                     />
                     {errors.name && <p className="text-xs text-rose-500 mt-1 font-medium">{errors.name}</p>}
@@ -240,7 +306,7 @@ export default function App() {
                       <select 
                         value={type} 
                         onChange={(e) => setType(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
                       >
                         <option value="INCOME">Income</option>
                         <option value="EXPENSE">Expense</option>
@@ -251,7 +317,7 @@ export default function App() {
                       <select 
                         value={category} 
                         onChange={(e) => setCategory(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
                       >
                         <option value="Minuman">Minuman</option>
                         <option value="Makanan">Makanan</option>
@@ -270,7 +336,6 @@ export default function App() {
                 </form>
               </div>
 
-              {/* TABEL TRANSAKSI */}
               <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                   <h2 className="text-base font-bold text-slate-900">Riwayat Transaksi</h2>
@@ -327,9 +392,7 @@ export default function App() {
                               <td className="py-3 text-slate-500">{item.category}</td>
                               <td className="py-3">
                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                  item.type === 'INCOME' 
-                                    ? 'bg-emerald-50 text-emerald-600' 
-                                    : 'bg-rose-50 text-rose-600'
+                                  item.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                                 }`}>
                                   {item.type}
                                 </span>
@@ -356,7 +419,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-
             </div>
           </>
         )}
@@ -373,27 +435,17 @@ export default function App() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase">Total Pemasukan</p>
-                  <p className="text-2xl font-black text-emerald-600 mt-1">
-                    Rp {totalIncome.toLocaleString('id-ID')}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">Dari {transactions.filter(t => t.type === 'INCOME').length} Transaksi</p>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalIncome.toLocaleString('id-ID')}</p>
                 </div>
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <TrendingUp size={24} />
-                </div>
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={24} /></div>
               </div>
 
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase">Total Pengeluaran</p>
-                  <p className="text-2xl font-black text-rose-600 mt-1">
-                    Rp {totalExpense.toLocaleString('id-ID')}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">Dari {transactions.filter(t => t.type === 'EXPENSE').length} Transaksi</p>
+                  <p className="text-2xl font-black text-rose-600 mt-1">Rp {totalExpense.toLocaleString('id-ID')}</p>
                 </div>
-                <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                  <TrendingDown size={24} />
-                </div>
+                <div className="p-3 bg-rose-50 text-rose-600 rounded-xl"><TrendingDown size={24} /></div>
               </div>
 
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
@@ -402,15 +454,11 @@ export default function App() {
                   <p className={`text-2xl font-black mt-1 ${netProfit >= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
                     Rp {netProfit.toLocaleString('id-ID')}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Status: {netProfit >= 0 ? 'Profit' : 'Defisit'}</p>
                 </div>
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                  <Wallet size={24} />
-                </div>
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Wallet size={24} /></div>
               </div>
             </div>
 
-            {/* RINCIAN SEMUA KAS */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Rincian Arus Kas</h2>
               <div className="space-y-3">
@@ -431,6 +479,59 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAMPILAN AI ADVISOR */}
+        {activeTab === 'ai-advisor' && (
+          <div className="max-w-4xl">
+            <header className="mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
+                  <Bot size={28} />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    NusaKas AI Advisor <Sparkles className="text-amber-400" size={20} />
+                  </h1>
+                  <p className="text-sm text-slate-400">Analisis otomatis performa kas & saran pertumbuhan bisnis UMKM</p>
+                </div>
+              </div>
+            </header>
+
+            <div className="bg-white p-8 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-6 pb-6 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Analisis Keuangan Real-Time</h2>
+                  <p className="text-xs text-slate-400">AI akan membaca {transactions.length} data transaksi Anda saat ini.</p>
+                </div>
+                <button 
+                  onClick={handleAnalyzeCashflow}
+                  disabled={isAnalyzing || transactions.length === 0}
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm flex items-center gap-2 transition disabled:opacity-50"
+                >
+                  {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                  {isAnalyzing ? 'Menganalisis...' : 'Mulai Analisis AI'}
+                </button>
+              </div>
+
+              {aiAnalysis ? (
+                <div className={`p-6 rounded-xl border text-sm leading-relaxed max-w-none ${
+                  aiAnalysis.includes('Gagal') 
+                    ? 'bg-rose-50 border-rose-200 text-rose-700 font-medium' 
+                    : 'bg-emerald-50/50 border-emerald-100 text-slate-700 prose prose-emerald'
+                }`}>
+                  <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400">
+                  <Bot size={48} className="mx-auto mb-3 text-slate-300" />
+                  <p className="text-sm font-medium">
+                    Klik tombol <strong className="text-slate-700">"Mulai Analisis AI"</strong> untuk mendapatkan masukan strategi bisnis dari Gemini AI.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
