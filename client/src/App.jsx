@@ -77,13 +77,36 @@ export default function App() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between p-5">
         <div>
-          <div className="flex items-center gap-3 px-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-xl">
-              N
-            </div>
+          {/* BRANDING LOGO */}
+          <div className="flex items-center gap-3 px-1 mb-8">
+            <svg viewBox="0 0 400 400" className="w-10 h-10 flex-shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10B981" />
+                  <stop offset="100%" stopColor="#047857" />
+                </linearGradient>
+                <linearGradient id="foldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#E6F4EA" />
+                  <stop offset="100%" stopColor="#A7F3D0" />
+                </linearGradient>
+              </defs>
+              <rect x="40" y="40" width="320" height="320" rx="80" fill="url(#bgGrad)" />
+              <g transform="translate(110, 110)">
+                <rect x="0" y="0" width="45" height="180" rx="22.5" fill="#FFFFFF" />
+                <path d="M 22.5 0 L 157.5 157.5 C 168 168 158 180 142 180 L 110 180 Z" fill="#FFFFFF" />
+                <rect x="125" y="45" width="45" height="135" rx="22.5" fill="#FFFFFF" />
+                <path d="M 125 45 C 125 15, 170 15, 170 45 L 170 110 C 170 125, 125 110, 125 90 Z" fill="url(#foldGrad)" />
+                <line x1="137" y1="42" x2="158" y2="42" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="137" y1="54" x2="158" y2="54" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
+                <line x1="137" y1="66" x2="151" y2="66" stroke="#047857" strokeWidth="4.5" strokeLinecap="round" />
+              </g>
+            </svg>
             <div>
-              <h1 className="font-bold text-lg leading-none text-slate-900">NusaKas</h1>
-              <span className="text-xs text-slate-400">POS & Fintech App</span>
+              <div className="font-extrabold text-lg leading-none tracking-tight">
+                <span className="text-[#064E3B]">Nusa</span>
+                <span className="text-[#10B981]">Kas</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">POS & Fintech</span>
             </div>
           </div>
 
