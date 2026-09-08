@@ -285,7 +285,7 @@ export default function App() {
       <div>
         <div className="flex items-center justify-between px-1 mb-8">
           <div className="flex items-center gap-3">
-            <svg viewBox="0 0 400 400" className="w-10 h-10 shrink-0" fill="none">
+            <svg viewBox="0 0 400 400" className="w-9 h-9 shrink-0" fill="none">
               <defs>
                 <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#10B981" />
@@ -295,12 +295,12 @@ export default function App() {
               <rect x="40" y="40" width="320" height="320" rx="80" fill="url(#bgGrad)" />
               <path d="M 130 110 L 270 270 M 270 110 L 130 270" stroke="#FFFFFF" strokeWidth="40" strokeLinecap="round" />
             </svg>
-            <div>
-              <div className="font-extrabold text-lg leading-none tracking-tight">
+            <div className="flex flex-col justify-center">
+              <div className="font-extrabold text-base leading-tight tracking-tight">
                 <span className="text-[#064E3B]">Nusa</span>
                 <span className="text-[#10B981]">Kas</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">POS & Fintech</span>
+              <span className="text-[9px] text-slate-400 font-semibold tracking-wider uppercase leading-none">POS & Fintech</span>
             </div>
           </div>
           {/* Tombol Close khusus Mobile */}
@@ -370,17 +370,20 @@ export default function App() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-full overflow-y-auto">
         
-        {/* MOBILE TOPBAR (Tombol Hamburger) */}
+        {/* MOBILE TOPBAR (Tombol Hamburger & Logo Rapi) */}
         <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2.5">
             <svg viewBox="0 0 400 400" className="w-8 h-8 shrink-0" fill="none">
               <rect x="40" y="40" width="320" height="320" rx="80" fill="#10B981" />
               <path d="M 130 110 L 270 270 M 270 110 L 130 270" stroke="#FFFFFF" strokeWidth="40" strokeLinecap="round" />
             </svg>
-            <span className="font-extrabold text-base tracking-tight">
-              <span className="text-[#064E3B]">Nusa</span>
-              <span className="text-[#10B981]">Kas</span>
-            </span>
+            <div className="flex flex-col justify-center">
+              <span className="font-extrabold text-sm leading-tight tracking-tight">
+                <span className="text-[#064E3B]">Nusa</span>
+                <span className="text-[#10B981]">Kas</span>
+              </span>
+              <span className="text-[8px] text-slate-400 font-semibold tracking-wider uppercase leading-none">POS & Fintech</span>
+            </div>
           </div>
           <button 
             onClick={() => setIsMobileSidebarOpen(true)}
