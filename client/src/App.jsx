@@ -36,9 +36,7 @@ export default function App() {
   const [targetResult, setTargetResult] = useState('');
   const [isCalculatingTarget, setIsCalculatingTarget] = useState(false);
 
-  // -------------------------------------------------------------
-  // STATE MANAGEMENT MULTI-SESSION CHATBOT (NUSA) WITH LOCALSTORAGE
-  // -------------------------------------------------------------
+  // State Management Multi-Session Chatbot (Nusa)
   const [chatSessions, setChatSessions] = useState(() => {
     const savedSessions = localStorage.getItem('nusakas_chat_sessions');
     if (savedSessions) {
@@ -69,7 +67,6 @@ export default function App() {
   // State Errors Form
   const [errors, setErrors] = useState({});
 
-  // Sesi Chat Aktif Saat Ini
   const currentSession = chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
 
   // Hitung Arus Kas
@@ -90,13 +87,11 @@ export default function App() {
     return matchesSearch && matchesType;
   });
 
-  // Simpan seluruh daftar sesi chat ke localStorage & Auto Scroll
   useEffect(() => {
     localStorage.setItem('nusakas_chat_sessions', JSON.stringify(chatSessions));
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatSessions, activeSessionId]);
 
-  // Inisialisasi/Reset Instance Gemini SDK startChat saat berpindah sesi
   useEffect(() => {
     if (!currentSession) return;
     try {
@@ -118,7 +113,6 @@ export default function App() {
     }
   }, [activeSessionId]);
 
-  // Buat Sesi Chat Baru
   const handleCreateNewChat = () => {
     const newId = Date.now().toString();
     const newSession = {
@@ -130,7 +124,6 @@ export default function App() {
     setActiveSessionId(newId);
   };
 
-  // Hapus Sesi Chat
   const handleDeleteSession = (id, e) => {
     e.stopPropagation();
     if (chatSessions.length === 1) {
@@ -144,7 +137,6 @@ export default function App() {
     }
   };
 
-  // Kirim Pesan pada Sesi Aktif
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!inputChat.trim() || isChatLoading) return;
@@ -152,7 +144,6 @@ export default function App() {
     const userText = inputChat;
     setInputChat('');
 
-    // Update pesan & judul percakapan jika ini pesan pertama pengguna
     setChatSessions(prev => prev.map(s => {
       if (s.id === activeSessionId) {
         const isFirstUserMsg = s.messages.filter(m => m.sender === 'user').length === 0;
@@ -197,20 +188,15 @@ export default function App() {
     }
   };
 
-  // FITUR AI 2: Auto Categorize Input Transaksi
   const handleAutoCategorize = async () => {
     if (!name.trim()) return;
     setIsAiCategorizing(true);
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-      const prompt = `Analisis nama transaksi ini: "${name}". 
-      Tentukan TIPE ("INCOME" atau "EXPENSE") dan KATEGORI (Pilih salah satu: "Minuman", "Makanan", "Bahan Baku", "Operasional").
-      Hanya berikan JSON valid tanpa markdown, contoh: {"type": "EXPENSE", "category": "Bahan Baku"}`;
-
+      const prompt = `Analisis nama transaksi ini: "${name}". Tentukan TIPE ("INCOME" atau "EXPENSE") dan KATEGORI ("Minuman", "Makanan", "Bahan Baku", "Operasional"). Berikan JSON valid saja: {"type": "EXPENSE", "category": "Bahan Baku"}`;
       const result = await model.generateContent(prompt);
       const cleanJson = result.response.text().replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
-      
       if (parsed.type) setType(parsed.type);
       if (parsed.category) setCategory(parsed.category);
     } catch (err) {
@@ -220,50 +206,35 @@ export default function App() {
     }
   };
 
-  // FITUR AI 3: Audit Laporan Kas
   const handleAnalyzeCashflow = async () => {
     setIsAnalyzing(true);
     setAiAnalysis('');
     try {
       const promptData = { totalIncome, totalExpense, netProfit, transactionCount: transactions.length, recentTransactions: transactions.slice(-10) };
       const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-      const prompt = `Kamu adalah Nusa, Konsultan Keuangan UMKM POS NusaKas.
-      Analisis data kas berikut: ${JSON.stringify(promptData, null, 2)}
-      Berikan ringkasan audit singkat meliputi:
-      - Status Kesehatan Kas
-      - Potensi Pemborosan / Pengeluaran Terbesar
-      - 2 Saran Aksi Cepat Minggu Ini`;
-
+      const prompt = `Konsultan Keuangan UMKM POS NusaKas. Analisis data kas: ${JSON.stringify(promptData)}. Berikan ringkasan singkat status kas, potensi pemborosan, dan 2 saran aksi cepat.`;
       const result = await model.generateContent(prompt);
       setAiAnalysis(result.response.text());
     } catch (err) {
       console.error(err);
-      setAiAnalysis("Gagal terhubung dengan Nusa. Coba lagi beberapa saat lagi.");
+      setAiAnalysis("Gagal terhubung dengan Nusa.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // FITUR AI 4: Kalkulator Target Profit
   const handleCalculateTarget = async () => {
     if (!targetAmount) return;
     setIsCalculatingTarget(true);
     setTargetResult('');
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-      const prompt = `Kamu adalah Nusa, asisten bisnis UMKM. 
-      Target Laba Bersih yang diinginkan: Rp ${Number(targetAmount).toLocaleString('id-ID')}.
-      Data Kas Toko: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}.
-      
-      Berikan estimasi ringkas (maksimal 3 poin):
-      - Estimasi porsi/cup terjual per hari.
-      - Rekomendasi strategi bundling/promo cepat.`;
-
+      const prompt = `Asisten bisnis. Target Laba: Rp ${Number(targetAmount).toLocaleString('id-ID')}. Kas: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}. Berikan estimasi porsi/cup terjual per hari dan rekomendasi promo singkat.`;
       const result = await model.generateContent(prompt);
       setTargetResult(result.response.text());
     } catch (err) {
       console.error(err);
-      setTargetResult("Gagal menghitung target. Pastikan nominal angka valid.");
+      setTargetResult("Gagal menghitung target.");
     } finally {
       setIsCalculatingTarget(false);
     }
@@ -273,14 +244,12 @@ export default function App() {
     e.preventDefault();
     const formData = { name, price: price === '' ? NaN : Number(price), type, category };
     const validationResult = transactionSchema.safeParse(formData);
-
     if (!validationResult.success) {
       const formattedErrors = {};
       validationResult.error.issues.forEach((issue) => { formattedErrors[issue.path[0]] = issue.message; });
       setErrors(formattedErrors);
       return;
     }
-
     setErrors({});
     const success = await addTx({ ...formData, qty: 1 });
     if (success) { setName(''); setPrice(''); }
@@ -294,7 +263,6 @@ export default function App() {
     if (window.confirm('Keluar dari NusaKas?')) { window.location.reload(); }
   };
 
-  // Kustom visual Markdown
   const markdownComponents = {
     h1: ({node, ...props}) => <h1 className="text-sm font-bold text-slate-900 mt-2 mb-1" {...props} />,
     h2: ({node, ...props}) => <h2 className="text-xs font-bold text-slate-900 mt-2 mb-1" {...props} />,
@@ -627,9 +595,9 @@ export default function App() {
           </div>
         )}
 
-        {/* TAMPILAN AI ADVISOR (TANYA NUSA WITH MULTI-SESSION CHAT) */}
+        {/* TAMPILAN AI ADVISOR (TANYA NUSA) */}
         {activeTab === 'ai-advisor' && (
-          <div className="max-w-6xl space-y-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             <header className="flex items-center gap-3">
               <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-200">
                 <Bot size={28} />
@@ -642,68 +610,71 @@ export default function App() {
               </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* LAYOUT CHATBOX UTAMA: SIDEBAR CHAT (KIRI) & CHAT ROOM (KANAN) */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden p-4 min-h-[580px]">
               
-              {/* SIDEBAR RIWAYAT CHAT (SESI CHAT) */}
-              <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden h-[530px]">
-                <div className="p-3 border-b border-slate-100">
+              {/* Sidebar Riwayat Sesi Chat */}
+              <div className="md:col-span-4 lg:col-span-3 border-r border-slate-100 pr-4 flex flex-col justify-between">
+                <div>
                   <button 
                     onClick={handleCreateNewChat}
-                    className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition"
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition shadow-sm mb-4"
                   >
                     <MessageSquarePlus size={16} /> Chat Baru
                   </button>
+
+                  <p className="text-[10px] font-bold text-slate-400 uppercase px-2 mb-2">Riwayat Percakapan</p>
+                  <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+                    {chatSessions.map((session) => (
+                      <div 
+                        key={session.id}
+                        onClick={() => setActiveSessionId(session.id)}
+                        className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer text-xs transition ${
+                          session.id === activeSessionId 
+                            ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-100' 
+                            : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <MessageSquare size={14} className="shrink-0 text-slate-400 group-hover:text-emerald-600" />
+                          <span className="truncate">{session.title}</span>
+                        </div>
+                        <button 
+                          onClick={(e) => handleDeleteSession(session.id, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded transition"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Riwayat Chat</p>
-                  {chatSessions.map((session) => (
-                    <div 
-                      key={session.id}
-                      onClick={() => setActiveSessionId(session.id)}
-                      className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs transition ${
-                        session.id === activeSessionId 
-                          ? 'bg-emerald-50 text-emerald-700 font-bold' 
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <MessageSquare size={14} className="shrink-0 text-slate-400 group-hover:text-emerald-600" />
-                        <span className="truncate">{session.title}</span>
-                      </div>
-                      <button 
-                        onClick={(e) => handleDeleteSession(session.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded transition"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
+                <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between px-2">
+                  <span>Model Aktif</span>
+                  <span className="font-bold text-emerald-600">Gemini 3.6 Flash</span>
                 </div>
               </div>
 
-              {/* CHATBOT BOX UTAMA */}
-              <div className="lg:col-span-9 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col h-[530px] overflow-hidden">
-                <div className="p-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              {/* Ruang Chat Utama */}
+              <div className="md:col-span-8 lg:col-span-9 flex flex-col h-[560px]">
+                <div className="pb-3 border-b border-slate-100 flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="font-bold text-xs text-slate-800 truncate max-w-xs">
+                    <span className="font-bold text-xs text-slate-800 truncate">
                       {currentSession?.title}
                     </span>
                   </div>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md">
-                    Gemini 3.6 Flash
-                  </span>
                 </div>
 
-                {/* DAFTAR PESAN CHAT */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {/* Daftar Pesan */}
+                <div className="flex-1 overflow-y-auto pr-2 space-y-3 mb-3">
                   {currentSession?.messages.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                      <div className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed ${
                         msg.sender === 'user' 
                           ? 'bg-emerald-600 text-white rounded-br-none font-medium' 
-                          : 'bg-slate-100 text-slate-800 rounded-bl-none'
+                          : 'bg-slate-50 border border-slate-100 text-slate-800 rounded-bl-none'
                       }`}>
                         <ReactMarkdown components={markdownComponents}>{msg.text}</ReactMarkdown>
                       </div>
@@ -711,27 +682,27 @@ export default function App() {
                   ))}
                   {isChatLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-slate-100 p-3 rounded-2xl rounded-bl-none text-xs text-slate-400 flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-emerald-600" /> Nusa sedang berpikir...
+                      <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl rounded-bl-none text-xs text-slate-400 flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin text-emerald-600" /> Nusa sedang meracik jawaban...
                       </div>
                     </div>
                   )}
                   <div ref={chatEndRef} />
                 </div>
 
-                {/* FORM INPUT CHAT */}
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 flex items-center gap-2 bg-white">
+                {/* Form Input Chat */}
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2 pt-2 border-t border-slate-100">
                   <input 
                     type="text" 
                     value={inputChat}
                     onChange={(e) => setInputChat(e.target.value)}
-                    placeholder="Tanya Nusa tentang keuangan toko..."
-                    className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder="Tanya Nusa tentang keuangan toko atau strategi promo..."
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   <button 
                     type="submit"
                     disabled={!inputChat.trim() || isChatLoading}
-                    className="p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition disabled:opacity-50 shrink-0"
+                    className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition disabled:opacity-50 shrink-0 shadow-sm"
                   >
                     <Send size={16} />
                   </button>
@@ -740,11 +711,11 @@ export default function App() {
 
             </div>
 
-            {/* BARIS UTILITAS FITUR AI (KALKULATOR & AUDIT) */}
+            {/* GRID FITUR PENDUKUNG (KALKULATOR & AUDIT) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
               
-              {/* KALKULATOR TARGET OMZET */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+              {/* Kalkulator Target */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
                 <div className="flex items-center gap-2 mb-3 text-emerald-600">
                   <Target size={20} />
                   <h2 className="font-bold text-slate-900 text-base">Kalkulator Target Keuntungan</h2>
@@ -759,26 +730,26 @@ export default function App() {
                     value={targetAmount}
                     onChange={(e) => setTargetAmount(e.target.value)}
                     placeholder="Masukkan nominal target"
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   <button 
                     onClick={handleCalculateTarget}
                     disabled={isCalculatingTarget || !targetAmount}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition disabled:opacity-50"
+                    className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl flex items-center gap-1.5 transition disabled:opacity-50 shadow-sm"
                   >
                     {isCalculatingTarget ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Hitung Target
                   </button>
                 </div>
 
                 {targetResult && (
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-xs text-slate-700 leading-relaxed">
+                  <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-xs text-slate-700 leading-relaxed">
                     <ReactMarkdown components={markdownComponents}>{targetResult}</ReactMarkdown>
                   </div>
                 )}
               </div>
 
-              {/* AUDIT LAPORAN KAS */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+              {/* Audit Laporan Kas */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 text-emerald-600">
                     <Lightbulb size={20} />
@@ -787,18 +758,18 @@ export default function App() {
                   <button 
                     onClick={handleAnalyzeCashflow}
                     disabled={isAnalyzing || transactions.length === 0}
-                    className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition disabled:opacity-50"
+                    className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl font-bold transition disabled:opacity-50"
                   >
                     {isAnalyzing ? 'Menganalisis...' : 'Audit Otomatis'}
                   </button>
                 </div>
 
                 {aiAnalysis ? (
-                  <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto">
+                  <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto">
                     <ReactMarkdown components={markdownComponents}>{aiAnalysis}</ReactMarkdown>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 text-center py-4">
+                  <p className="text-xs text-slate-400 text-center py-6">
                     Klik "Audit Otomatis" untuk ringkasan performa keuangan lengkap.
                   </p>
                 )}
