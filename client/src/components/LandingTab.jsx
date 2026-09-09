@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   ArrowRight, Play, Zap, BarChart3, TrendingUp, 
   Bot, ShieldCheck, Smile, Users, Star, Clock, Sparkles, 
-  Mail, Phone, MapPin, Instagram, Linkedin, Twitter 
+  Mail, Phone, MapPin 
 } from 'lucide-react';
 import logoNusa from '../assets/logoNusa.png';
 import heroImg from '../assets/hero.png';
@@ -31,10 +31,10 @@ export function LandingTab({ onGetStarted }) {
         </div>
 
         <nav className="hidden md:flex items-center gap-8 text-xs font-bold text-slate-600">
-          <a href="#beranda" className="text-emerald-600 transition hover:-translate-y-0.5">Beranda</a>
-          <a href="#fitur" className="hover:text-emerald-600 transition hover:-translate-y-0.5">Fitur</a>
-          <a href="#carakerja" className="hover:text-emerald-600 transition hover:-translate-y-0.5">Cara Kerja</a>
-          <a href="#tentang" className="hover:text-emerald-600 transition hover:-translate-y-0.5">Tentang</a>
+          <span className="text-emerald-600 cursor-pointer transition hover:-translate-y-0.5">Beranda</span>
+          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Fitur</span>
+          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Cara Kerja</span>
+          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Tentang</span>
         </nav>
 
         <button 
@@ -90,7 +90,7 @@ export function LandingTab({ onGetStarted }) {
           </div>
         </div>
 
-        {/* Kolom Gambar/Mockup Dasbor di Kanan (Efek 3D Card Hover) */}
+        {/* Kolom Gambar/Mockup Dasbor di Kanan */}
         <div className="lg:col-span-6 relative flex justify-center">
           <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 to-teal-400 rounded-3xl blur-xl opacity-20 group-hover:opacity-100 transition duration-1000 animate-pulse" />
           <div className="relative w-full max-w-xl bg-white p-3 rounded-3xl shadow-2xl border border-slate-100 transform transition-all duration-500 hover:-translate-y-2 hover:shadow-emerald-600/20">
@@ -113,7 +113,7 @@ export function LandingTab({ onGetStarted }) {
 
       </section>
 
-      {/* 3. FITUR UNGGULAN (GRID 6 KOTAK DENGAN INTERACTIVE CARD HOVER) */}
+      {/* 3. FITUR UNGGULAN */}
       <section id="fitur" className="max-w-7xl mx-auto px-6 py-24">
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="px-3.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200/60 rounded-full text-xs font-bold uppercase tracking-wider">
@@ -175,7 +175,7 @@ export function LandingTab({ onGetStarted }) {
         </div>
       </section>
 
-      {/* 5. CARA KERJA (3 LANGKAH) */}
+      {/* 5. CARA KERJA */}
       <section id="carakerja" className="max-w-7xl mx-auto px-6 py-24">
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="px-3.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200/60 rounded-full text-xs font-bold uppercase tracking-wider">
@@ -208,7 +208,7 @@ export function LandingTab({ onGetStarted }) {
         </div>
       </section>
 
-      {/* 6. BANNER CTA HIJAU */}
+      {/* 6. BANNER CTA */}
       <section className="max-w-7xl mx-auto px-6 py-12">
         <div className="bg-gradient-to-br from-emerald-900 via-emerald-700 to-teal-700 rounded-3xl p-10 sm:p-16 text-white text-center relative overflow-hidden shadow-2xl transition duration-500 transform hover:scale-[1.01]">
           <div className="absolute -right-20 -top-20 w-72 h-72 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
@@ -231,7 +231,7 @@ export function LandingTab({ onGetStarted }) {
       </section>
 
       {/* 7. FOOTER */}
-      <footer id="tentang" className="bg-white border-t border-slate-200/80 pt-16 pb-12 px-6 lg:px-16 mt-12">
+      <footer className="bg-white border-t border-slate-200/80 pt-16 pb-12 px-6 lg:px-16 mt-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-100">
           
           {/* Kolom Info Brand */}
@@ -249,9 +249,9 @@ export function LandingTab({ onGetStarted }) {
               Platform kasir pintar dan manajemen keuangan digital terdepan yang dirancang khusus untuk membantu UMKM Indonesia tumbuh dan berkembang.
             </p>
             <div className="flex items-center gap-3 pt-2">
-              <a href="#social" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 flex items-center justify-center transition duration-300"><Instagram size={14} /></a>
-              <a href="#social" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 flex items-center justify-center transition duration-300"><Twitter size={14} /></a>
-              <a href="#social" className="w-8 h-8 rounded-full bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 flex items-center justify-center transition duration-300"><Linkedin size={14} /></a>
+              <span className="px-3 py-1 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 text-[10px] font-bold rounded-full transition duration-300 cursor-pointer">IG</span>
+              <span className="px-3 py-1 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 text-[10px] font-bold rounded-full transition duration-300 cursor-pointer">TW</span>
+              <span className="px-3 py-1 bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-600 text-[10px] font-bold rounded-full transition duration-300 cursor-pointer">IN</span>
             </div>
           </div>
 
@@ -259,10 +259,10 @@ export function LandingTab({ onGetStarted }) {
           <div className="md:col-span-2 space-y-3">
             <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">Navigasi</h4>
             <ul className="space-y-2.5 text-xs font-bold text-slate-500">
-              <li><a href="#beranda" className="hover:text-emerald-600 transition">Beranda</a></li>
-              <li><a href="#fitur" className="hover:text-emerald-600 transition">Fitur Utama</a></li>
-              <li><a href="#carakerja" className="hover:text-emerald-600 transition">Cara Kerja</a></li>
-              <li><a href="#tentang" className="hover:text-emerald-600 transition">Tentang Kami</a></li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Beranda</li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Fitur Utama</li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Cara Kerja</li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Tentang Kami</li>
             </ul>
           </div>
 
@@ -270,9 +270,9 @@ export function LandingTab({ onGetStarted }) {
           <div className="md:col-span-2 space-y-3">
             <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">Legal & Privasi</h4>
             <ul className="space-y-2.5 text-xs font-bold text-slate-500">
-              <li><a href="#syarat" className="hover:text-emerald-600 transition">Syarat & Ketentuan</a></li>
-              <li><a href="#kebijakan" className="hover:text-emerald-600 transition">Kebijakan Privasi</a></li>
-              <li><a href="#keamanan" className="hover:text-emerald-600 transition">Keamanan Data</a></li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Syarat & Ketentuan</li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Kebijakan Privasi</li>
+              <li className="cursor-pointer hover:text-emerald-600 transition">Keamanan Data</li>
             </ul>
           </div>
 
@@ -303,9 +303,9 @@ export function LandingTab({ onGetStarted }) {
             &copy; 2026 NusaKas. Semua hak dilindungi.
           </div>
           <div className="flex items-center gap-6">
-            <a href="#privacy" className="hover:text-slate-600 transition">Kebijakan Privasi</a>
-            <a href="#terms" className="hover:text-slate-600 transition">Ketentuan Layanan</a>
-            <a href="#support" className="hover:text-slate-600 transition">Pusat Bantuan</a>
+            <span className="cursor-pointer hover:text-slate-600 transition">Kebijakan Privasi</span>
+            <span className="cursor-pointer hover:text-slate-600 transition">Ketentuan Layanan</span>
+            <span className="cursor-pointer hover:text-slate-600 transition">Pusat Bantuan</span>
           </div>
         </div>
       </footer>
