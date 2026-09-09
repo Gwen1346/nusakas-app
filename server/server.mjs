@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Inisialisasi Google GenAI (mengambil API key dari environment variable server)
+// Inisialisasi Google GenAI menggunakan Environment Variable (Aman dari blokir GitHub)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // In-Memory Database Transaksi
@@ -53,7 +53,7 @@ app.post('/api/v1/ai/chat', async (req, res) => {
   try {
     const { message, history, systemInstruction } = req.body;
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash', // atau gemini-1.5-flash yang stabil
+      model: 'gemini-3.6-flash',
       systemInstruction: systemInstruction || 'Nama kamu Nusa, asisten keuangan UMKM POS.'
     });
 
@@ -69,7 +69,7 @@ app.post('/api/v1/ai/chat', async (req, res) => {
 app.post('/api/v1/ai/generate', async (req, res) => {
   try {
     const { prompt } = req.body;
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
     const result = await model.generateContent(prompt);
     res.json({ success: true, text: result.response.text() });
   } catch (err) {
