@@ -31,10 +31,10 @@ export function LandingTab({ onGetStarted }) {
         </div>
 
         <nav className="hidden md:flex items-center gap-8 text-xs font-bold text-slate-600">
-          <span className="text-emerald-600 cursor-pointer transition hover:-translate-y-0.5">Beranda</span>
-          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Fitur</span>
-          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Cara Kerja</span>
-          <span className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Tentang</span>
+          <a href="#beranda" className="text-emerald-600 cursor-pointer transition hover:-translate-y-0.5">Beranda</a>
+          <a href="#fitur" className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Fitur</a>
+          <a href="#carakerja" className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Cara Kerja</a>
+          <a href="#tentang" className="cursor-pointer hover:text-emerald-600 transition hover:-translate-y-0.5">Tentang</a>
         </nav>
 
         <button 
@@ -231,7 +231,7 @@ export function LandingTab({ onGetStarted }) {
       </section>
 
       {/* 7. FOOTER */}
-      <footer className="bg-white border-t border-slate-200/80 pt-16 pb-12 px-6 lg:px-16 mt-12">
+      <footer id="tentang" className="bg-white border-t border-slate-200/80 pt-16 pb-12 px-6 lg:px-16 mt-12">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-100">
           
           {/* Kolom Info Brand */}
@@ -259,10 +259,10 @@ export function LandingTab({ onGetStarted }) {
           <div className="md:col-span-2 space-y-3">
             <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">Navigasi</h4>
             <ul className="space-y-2.5 text-xs font-bold text-slate-500">
-              <li className="cursor-pointer hover:text-emerald-600 transition">Beranda</li>
-              <li className="cursor-pointer hover:text-emerald-600 transition">Fitur Utama</li>
-              <li className="cursor-pointer hover:text-emerald-600 transition">Cara Kerja</li>
-              <li className="cursor-pointer hover:text-emerald-600 transition">Tentang Kami</li>
+              <li><a href="#beranda" className="hover:text-emerald-600 transition">Beranda</a></li>
+              <li><a href="#fitur" className="hover:text-emerald-600 transition">Fitur Utama</a></li>
+              <li><a href="#carakerja" className="hover:text-emerald-600 transition">Cara Kerja</a></li>
+              <li><a href="#tentang" className="hover:text-emerald-600 transition">Tentang Kami</a></li>
             </ul>
           </div>
 
