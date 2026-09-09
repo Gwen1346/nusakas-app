@@ -1,10 +1,8 @@
 // src/components/AiAdvisorTab.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import ReactMarkdown from 'react-markdown';
 import { Send, Sparkles, MessageSquarePlus, MessageSquare, Trash2, Target, Lightbulb, Bot, Loader2, Zap } from 'lucide-react';
-
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
+import axios from 'axios';
 
 export function AiAdvisorTab({ kasir }) {
   const transactions = kasir?.transactions || [];
@@ -42,7 +40,6 @@ export function AiAdvisorTab({ kasir }) {
   const [inputChat, setInputChat] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef(null);
-  const chatSessionRef = useRef(null);
 
   // State AI Features Tambahan
   const [targetAmount, setTargetAmount] = useState('1000000');
@@ -58,27 +55,6 @@ export function AiAdvisorTab({ kasir }) {
     localStorage.setItem('nusakas_chat_sessions', JSON.stringify(chatSessions));
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatSessions, activeSessionId]);
-
-  useEffect(() => {
-    if (!currentSession) return;
-    try {
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-3.6-flash',
-        systemInstruction: `Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.`
-      });
-
-      const formattedHistory = currentSession.messages
-        .filter((_, index) => index > 0)
-        .map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
-        }));
-
-      chatSessionRef.current = model.startChat({ history: formattedHistory });
-    } catch (err) {
-      console.error("Gagal inisialisasi sesi chat Nusa:", err);
-    }
-  }, [activeSessionId]);
 
   const handleCreateNewChat = () => {
     const newId = Date.now().toString();
@@ -109,6 +85,8 @@ export function AiAdvisorTab({ kasir }) {
     const userText = inputChat;
     setInputChat('');
 
+    const updatedMessages = [...currentSession.messages, { sender: 'user', text: userText }];
+
     setChatSessions(prev => prev.map(s => {
       if (s.id === activeSessionId) {
         const isFirstUserMsg = s.messages.filter(m => m.sender === 'user').length === 0;
@@ -116,7 +94,7 @@ export function AiAdvisorTab({ kasir }) {
         return {
           ...s,
           title: newTitle,
-          messages: [...s.messages, { sender: 'user', text: userText }]
+          messages: updatedMessages
         };
       }
       return s;
@@ -125,14 +103,22 @@ export function AiAdvisorTab({ kasir }) {
     setIsChatLoading(true);
 
     try {
-      if (!chatSessionRef.current) {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-        chatSessionRef.current = model.startChat();
-      }
+      const formattedHistory = updatedMessages
+        .slice(1, -1) // Skip welcome message dan pesan terakhir user
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        }));
 
       const promptWithContext = `[Kas Toko -> Income: Rp${totalIncome}, Expense: Rp${totalExpense}, Profit: Rp${netProfit}]\nPertanyaan: ${userText}`;
-      const result = await chatSessionRef.current.sendMessage(promptWithContext);
-      const responseText = result.response.text();
+      
+      const res = await axios.post('/api/v1/ai/chat', {
+        message: promptWithContext,
+        history: formattedHistory,
+        systemInstruction: 'Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.'
+      });
+
+      const responseText = res.data.text;
 
       setChatSessions(prev => prev.map(s => {
         if (s.id === activeSessionId) {
@@ -158,10 +144,9 @@ export function AiAdvisorTab({ kasir }) {
     setIsCalculatingTarget(true);
     setTargetResult('');
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const prompt = `Asisten bisnis. Target Laba: Rp ${Number(targetAmount).toLocaleString('id-ID')}. Kas: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}. Berikan estimasi porsi/cup terjual per hari dan rekomendasi promo singkat.`;
-      const result = await model.generateContent(prompt);
-      setTargetResult(result.response.text());
+      const res = await axios.post('/api/v1/ai/generate', { prompt });
+      setTargetResult(res.data.text);
     } catch (err) {
       console.error(err);
       setTargetResult("Gagal menghitung target.");
@@ -175,10 +160,9 @@ export function AiAdvisorTab({ kasir }) {
     setAiAnalysis('');
     try {
       const promptData = { totalIncome, totalExpense, netProfit, transactionCount: transactions.length, recentTransactions: transactions.slice(-10) };
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const prompt = `Konsultan Keuangan UMKM POS NusaKas. Analisis data kas: ${JSON.stringify(promptData)}. Berikan ringkasan singkat status kas, potensi pemborosan, dan 2 saran aksi cepat.`;
-      const result = await model.generateContent(prompt);
-      setAiAnalysis(result.response.text());
+      const res = await axios.post('/api/v1/ai/generate', { prompt });
+      setAiAnalysis(res.data.text);
     } catch (err) {
       console.error(err);
       setAiAnalysis("Gagal terhubung dengan Nusa.");
@@ -204,7 +188,6 @@ export function AiAdvisorTab({ kasir }) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
-      {/* Header Banner Modern dengan Gradient Tipis */}
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-6 rounded-3xl text-white shadow-lg relative overflow-hidden flex items-center justify-between">
         <div className="absolute right-0 top-0 translate-x-6 -translate-y-6 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="flex items-center gap-4 relative z-10">
@@ -219,13 +202,11 @@ export function AiAdvisorTab({ kasir }) {
           </div>
         </div>
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-[10px] font-extrabold text-emerald-200 tracking-wider">
-          <Zap size={13} className="text-amber-300" /> GEMINI 3.6 FLASH
+          <Zap size={13} className="text-amber-300" /> GEMINI FLASH
         </div>
       </div>
 
-      {/* Main Chat Area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 bg-white rounded-3xl border border-slate-100 shadow-xs overflow-hidden p-4 sm:p-5">
-        {/* Sidebar Riwayat Chat */}
         <div className="lg:col-span-4 xl:col-span-3 border-b lg:border-b-0 lg:border-r border-slate-100 pb-4 lg:pb-0 lg:pr-4 flex flex-col justify-between">
           <div>
             <button 
@@ -261,16 +242,8 @@ export function AiAdvisorTab({ kasir }) {
               ))}
             </div>
           </div>
-
-          <div className="hidden lg:flex pt-4 border-t border-slate-100 text-[10px] text-slate-400 font-bold items-center justify-between px-2 mt-4 uppercase tracking-wider">
-            <span>Status Engine</span>
-            <span className="text-emerald-600 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Online
-            </span>
-          </div>
         </div>
 
-        {/* Kotak Percakapan */}
         <div className="lg:col-span-8 xl:col-span-9 flex flex-col h-[420px] lg:h-[500px]">
           <div className="pb-3 border-b border-slate-100 flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -284,7 +257,6 @@ export function AiAdvisorTab({ kasir }) {
             </span>
           </div>
 
-          {/* List Chat Bubble */}
           <div className="flex-1 overflow-y-auto pr-2 space-y-3.5 mb-3">
             {currentSession?.messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -307,7 +279,6 @@ export function AiAdvisorTab({ kasir }) {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Form Input Chat */}
           <form onSubmit={handleSendMessage} className="flex items-center gap-2.5 pt-3 border-t border-slate-100">
             <input 
               type="text" 
@@ -327,9 +298,7 @@ export function AiAdvisorTab({ kasir }) {
         </div>
       </div>
 
-      {/* Fitur Tambahan (Kalkulator Target & Audit) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-2">
-        {/* Kalkulator Target */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-2 text-emerald-700">
@@ -367,7 +336,6 @@ export function AiAdvisorTab({ kasir }) {
           )}
         </div>
 
-        {/* Audit Laporan Kas */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
