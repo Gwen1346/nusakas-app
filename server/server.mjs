@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Inisialisasi Google GenAI (mengambil API key dari environment variable server)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // In-Memory Database Transaksi
 let transactions = [
@@ -44,5 +48,35 @@ app.delete('/api/v1/transactions/:id', (req, res) => {
   res.json({ success: true, message: 'Transaksi berhasil dihapus' });
 });
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`Backend berjalan di http://localhost:${PORT}`));
+// Endpoint 4: AI Chat & Analisis (Nusa Advisor)
+app.post('/api/v1/ai/chat', async (req, res) => {
+  try {
+    const { message, history, systemInstruction } = req.body;
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash', // atau gemini-1.5-flash yang stabil
+      systemInstruction: systemInstruction || 'Nama kamu Nusa, asisten keuangan UMKM POS.'
+    });
+
+    const chat = model.startChat({ history: history || [] });
+    const result = await chat.sendMessage(message);
+    res.json({ success: true, text: result.response.text() });
+  } catch (err) {
+    console.error("AI Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/v1/ai/generate', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    res.json({ success: true, text: result.response.text() });
+  } catch (err) {
+    console.error("AI Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend berjalan di port ${PORT}`));
