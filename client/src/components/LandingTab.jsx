@@ -155,11 +155,11 @@ export function LandingTab({ onGetStarted }) {
         </div>
       </section>
 
-      {/* 4. STATISTIK BAR */}
+      {/* 4. STATISTIK BAR (Versi Beta) */}
       <section className="bg-white border-y border-slate-100 py-12 my-10 shadow-xs relative">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
-            { icon: <Users size={20} />, value: "1.200+", label: "UMKM Telah Menggunakan" },
+            { icon: <Users size={20} />, value: "Beta Version", label: "Akses Eksklusif Awal" },
             { icon: <Star size={20} />, value: "99,9%", label: "Uptime Server" },
             { icon: <ShieldCheck size={20} />, value: "100%", label: "Data Aman & Terlindungi" },
             { icon: <Clock size={20} />, value: "24/7", label: "Dukungan Pelanggan" }
@@ -282,7 +282,7 @@ export function LandingTab({ onGetStarted }) {
             <ul className="space-y-3 text-xs text-slate-500 font-medium">
               <li className="flex items-center gap-2.5">
                 <Mail size={14} className="text-emerald-600 shrink-0" />
-                <span>halo@nusakas.id</span>
+                <span>support@nusakas.id</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone size={14} className="text-emerald-600 shrink-0" />
@@ -290,7 +290,7 @@ export function LandingTab({ onGetStarted }) {
               </li>
               <li className="flex items-start gap-2.5">
                 <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                <span>Jakarta Selatan, DKI Jakarta, Indonesia</span>
+                <span>Malang, Jawa Timur, Indonesia</span>
               </li>
             </ul>
           </div>
