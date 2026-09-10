@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Otomatis mendeteksi apakah berjalan di Vercel (production) atau lokal
+// Menggunakan origin penuh agar secara pasti menembak domain Vercel saat production
 const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:5000/api/v1'
-  : '/api/v1'; // Menggunakan relative path agar otomatis ikut domain Vercel yang aktif
+  : `${window.location.origin}/api/v1`;
 
 const api = axios.create({
   baseURL,
