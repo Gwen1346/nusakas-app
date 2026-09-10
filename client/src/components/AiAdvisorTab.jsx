@@ -112,7 +112,7 @@ export function AiAdvisorTab({ kasir }) {
 
       const promptWithContext = `[Kas Toko -> Income: Rp${totalIncome}, Expense: Rp${totalExpense}, Profit: Rp${netProfit}]\nPertanyaan: ${userText}`;
       
-      const res = await api.post('/api/v1/ai/chat', {
+      const res = await api.post('/ai/chat', {
         message: promptWithContext,
         history: formattedHistory,
         systemInstruction: 'Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.'
@@ -128,9 +128,16 @@ export function AiAdvisorTab({ kasir }) {
       }));
     } catch (err) {
       console.error(err);
+      const status = err?.response?.status;
+      let errorText = 'Maaf, sambungan Nusa terputus. Coba tanyakan lagi!';
+      if (status === 401 || status === 403) {
+        errorText = 'Sesi login kamu sudah habis. Coba login ulang, ya!';
+      } else if (status === 429) {
+        errorText = 'Nusa lagi kebanjiran pertanyaan (kuota AI habis). Coba lagi beberapa saat lagi, ya!';
+      }
       setChatSessions(prev => prev.map(s => {
         if (s.id === activeSessionId) {
-          return { ...s, messages: [...s.messages, { sender: 'nusa', text: 'Maaf, sambungan Nusa terputus. Coba tanyakan lagi!' }] };
+          return { ...s, messages: [...s.messages, { sender: 'nusa', text: errorText }] };
         }
         return s;
       }));
@@ -145,11 +152,18 @@ export function AiAdvisorTab({ kasir }) {
     setTargetResult('');
     try {
       const prompt = `Asisten bisnis. Target Laba: Rp ${Number(targetAmount).toLocaleString('id-ID')}. Kas: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}. Berikan estimasi porsi/cup terjual per hari dan rekomendasi promo singkat.`;
-      const res = await api.post('/api/v1/ai/generate', { prompt });
+      const res = await api.post('/ai/generate', { prompt });
       setTargetResult(res.data.text);
     } catch (err) {
       console.error(err);
-      setTargetResult("Gagal menghitung target.");
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setTargetResult("Sesi login kamu sudah habis. Coba login ulang, ya!");
+      } else if (status === 429) {
+        setTargetResult("Kuota AI sedang habis. Coba lagi beberapa saat lagi.");
+      } else {
+        setTargetResult("Gagal menghitung target. Coba lagi sebentar.");
+      }
     } finally {
       setIsCalculatingTarget(false);
     }
@@ -161,11 +175,18 @@ export function AiAdvisorTab({ kasir }) {
     try {
       const promptData = { totalIncome, totalExpense, netProfit, transactionCount: transactions.length, recentTransactions: transactions.slice(-10) };
       const prompt = `Konsultan Keuangan UMKM POS NusaKas. Analisis data kas: ${JSON.stringify(promptData)}. Berikan ringkasan singkat status kas, potensi pemborosan, dan 2 saran aksi cepat.`;
-      const res = await api.post('/api/v1/ai/generate', { prompt });
+      const res = await api.post('/ai/generate', { prompt });
       setAiAnalysis(res.data.text);
     } catch (err) {
       console.error(err);
-      setAiAnalysis("Gagal terhubung dengan Nusa.");
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setAiAnalysis("Sesi login kamu sudah habis. Coba login ulang, ya!");
+      } else if (status === 429) {
+        setAiAnalysis("Kuota AI sedang habis. Coba lagi beberapa saat lagi.");
+      } else {
+        setAiAnalysis("Gagal terhubung dengan Nusa. Coba lagi sebentar.");
+      }
     } finally {
       setIsAnalyzing(false);
     }
