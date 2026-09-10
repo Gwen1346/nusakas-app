@@ -7,13 +7,27 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Diagnostic output
+*.tgz
+*.sqlite
+
+# Dependency directories
 node_modules
+jspm_packages/
+
+# Production / Build output
 dist
 dist-ssr
+build/
+
+# Environment files & Secrets
 .env
 client/.env
+server/.env
 *.local
 
+# Database local
+db.json
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +39,8 @@ client/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Vite & Local Cache
+.vite/
+.temp/
+.cache/

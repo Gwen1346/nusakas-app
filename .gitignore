@@ -1,0 +1,13 @@
+# Environments
+.env
+server/.env
+client/.env
+
+# Dependencies
+node_modules/
+server/node_modules/
+client/node_modules/
+
+# Database
+db.json
+server/db.json

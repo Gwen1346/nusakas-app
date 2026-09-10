@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { LandingTab } from './components/LandingTab';
 import { DashboardTab } from './components/DashboardTab';
@@ -7,25 +7,72 @@ import { ReportTab } from './components/ReportTab';
 import { AiAdvisorTab } from './components/AiAdvisorTab';
 import { Modals } from './components/Modals';
 import { LogoutModal } from './components/LogoutModal';
+import AuthModal from './components/AuthModal'; // Komponen login/register baru
 import { useKasir } from './hooks/useKasir';
 import { Menu } from 'lucide-react';
 
 export default function App() {
+  const [user, setUser] = useState(null); // State user login
   const [activeTab, setActiveTab] = useState('landing');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const kasir = useKasir();
 
+  // Cek sesi login saat aplikasi pertama kali dibuka
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    if (savedUser && token) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
   const handleConfirmLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setActiveTab('landing');
+    setShowLogoutModal(false);
     window.location.reload();
   };
 
-  // Jika sedang di halaman landing, tampilkan landing page secara full screen (tanpa sidebar)
+  // Jika user belum login dan mencoba masuk ke dashboard/aplikasi, paksa tampilkan AuthModal atau biarkan di landing
+  // Di sini kita biarkan user melihat landing page, lalu saat klik "Mulai", jika belum login bisa diarahkan ke modal login.
+  
   if (activeTab === 'landing') {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
-        <LandingTab onGetStarted={() => setActiveTab('dashboard')} />
+        <LandingTab onGetStarted={() => {
+          // Jika belum login, arahkan ke login, jika sudah langsung ke dashboard
+          if (!user) {
+            setActiveTab('login-required');
+          } else {
+            setActiveTab('dashboard');
+          }
+        }} />
+        
+        {/* Modal Login jika user dari landing ingin mulai tapi belum login */}
+        {activeTab === 'login-required' && (
+          <AuthModal 
+            onLoginSuccess={(userData) => {
+              setUser(userData);
+              setActiveTab('dashboard');
+            }} 
+          />
+        )}
       </div>
+    );
+  }
+
+  // Jika belum login sama sekali tapi memaksa masuk rute lain
+  if (!user) {
+    return (
+      <AuthModal 
+        onLoginSuccess={(userData) => {
+          setUser(userData);
+          setActiveTab('dashboard');
+        }} 
+      />
     );
   }
 

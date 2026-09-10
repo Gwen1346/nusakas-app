@@ -1,34 +1,121 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+dotenv.config();
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-// Inisialisasi Google GenAI menggunakan Environment Variable (Aman dari blokir GitHub)
+const PORT = process.env.PORT || 5000;
+const DB_PATH = path.resolve('db.json');
+
+// Inisialisasi Google GenAI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// In-Memory Database Transaksi
-let transactions = [
-  { id: 1, name: 'Kopi Susu Aren', type: 'INCOME', category: 'Minuman', price: 18000, qty: 2, date: '2026-09-08' },
-  { id: 2, name: 'Beli Biji Kopi Espresso 1kg', type: 'EXPENSE', category: 'Bahan Baku', price: 180000, qty: 1, date: '2026-09-08' }
-];
+// Helper baca/tulis database JSON lokal
+const readDB = () => {
+  if (!fs.existsSync(DB_PATH)) {
+    fs.writeFileSync(DB_PATH, JSON.stringify({ users: [], transactions: [] }, null, 2));
+  }
+  const data = fs.readFileSync(DB_PATH, 'utf-8');
+  return JSON.parse(data);
+};
 
-// Endpoint 1: Ambil semua transaksi
-app.get('/api/v1/transactions', (req, res) => {
-  res.json({ success: true, data: transactions });
+const writeDB = (data) => {
+  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+};
+
+// Middleware verifikasi Token JWT
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ success: false, message: 'Akses ditolak, token tidak ditemukan' });
+
+  jwt.verify(token, process.env.JWT_SECRET || 'rahasia_super_aman', (err, user) => {
+    if (err) return res.status(403).json({ success: false, message: 'Token tidak valid' });
+    req.user = user;
+    next();
+  });
+};
+
+// ================= AUTHENTICATION ENDPOINTS =================
+
+// 1. Register User Baru
+app.post('/api/v1/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    const db = readDB();
+
+    const existingUser = db.users.find(u => u.email === email);
+    if (existingUser) return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      id: Date.now().toString(),
+      name,
+      email,
+      password: hashedPassword
+    };
+
+    db.users.push(newUser);
+    writeDB(db);
+
+    res.status(201).json({ success: true, message: 'Registrasi berhasil, silakan login' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
+  }
 });
 
-// Endpoint 2: Tambah transaksi baru
-app.post('/api/v1/transactions', (req, res) => {
+// 2. Login User
+app.post('/api/v1/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const db = readDB();
+
+    const user = db.users.find(u => u.email === email);
+    if (!user) return res.status(400).json({ success: false, message: 'Email atau password salah' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ success: false, message: 'Email atau password salah' });
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, name: user.name }, 
+      process.env.JWT_SECRET || 'rahasia_super_aman', 
+      { expiresIn: '7d' }
+    );
+
+    res.json({ success: true, message: 'Login berhasil', token, user: { id: user.id, name: user.name, email: user.email } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// ================= TRANSACTION ENDPOINTS (Multi-User) =================
+
+// 3. Ambil transaksi khusus user yang sedang login
+app.get('/api/v1/transactions', verifyToken, (req, res) => {
+  const db = readDB();
+  const userTransactions = db.transactions.filter(t => t.userId === req.user.id);
+  res.json({ success: true, data: userTransactions });
+});
+
+// 4. Tambah transaksi baru untuk user yang login
+app.post('/api/v1/transactions', verifyToken, (req, res) => {
   const { name, type, category, price, qty } = req.body;
   if (!name || !type || !price) {
     return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
   }
 
+  const db = readDB();
   const newTx = {
     id: Date.now(),
+    userId: req.user.id,
     name,
     type,
     category,
@@ -37,19 +124,26 @@ app.post('/api/v1/transactions', (req, res) => {
     date: new Date().toISOString().split('T')[0]
   };
 
-  transactions.push(newTx);
+  db.transactions.push(newTx);
+  writeDB(db);
+
   res.status(201).json({ success: true, data: newTx });
 });
 
-// Endpoint 3: Hapus transaksi berdasarkan ID
-app.delete('/api/v1/transactions/:id', (req, res) => {
+// 5. Hapus transaksi
+app.delete('/api/v1/transactions/:id', verifyToken, (req, res) => {
   const { id } = req.params;
-  transactions = transactions.filter((t) => t.id !== Number(id));
+  const db = readDB();
+  
+  db.transactions = db.transactions.filter((t) => !(t.id === Number(id) && t.userId === req.user.id));
+  writeDB(db);
+
   res.json({ success: true, message: 'Transaksi berhasil dihapus' });
 });
 
-// Endpoint 4: AI Chat & Analisis (Nusa Advisor)
-app.post('/api/v1/ai/chat', async (req, res) => {
+// ================= AI ENDPOINTS (Nusa Advisor) =================
+
+app.post('/api/v1/ai/chat', verifyToken, async (req, res) => {
   try {
     const { message, history, systemInstruction } = req.body;
     const model = genAI.getGenerativeModel({ 
@@ -66,7 +160,7 @@ app.post('/api/v1/ai/chat', async (req, res) => {
   }
 });
 
-app.post('/api/v1/ai/generate', async (req, res) => {
+app.post('/api/v1/ai/generate', verifyToken, async (req, res) => {
   try {
     const { prompt } = req.body;
     const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
@@ -78,5 +172,4 @@ app.post('/api/v1/ai/generate', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend berjalan di port ${PORT}`));
