@@ -1,4 +1,11 @@
 {
-  "users": [],
+  "users": [
+    {
+      "id": "1789013553895",
+      "name": "Gwen Mart",
+      "email": "gwen@gmail.com",
+      "password": "$2b$10$.OjMR/IU1yaT4cg/KXsES.CyEij.dTdf8dRdDa2b6DnbyZ3QLzxma"
+    }
+  ],
   "transactions": []
 }

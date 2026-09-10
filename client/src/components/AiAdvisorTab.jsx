@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Send, Sparkles, MessageSquarePlus, MessageSquare, Trash2, Target, Lightbulb, Bot, Loader2, Zap } from 'lucide-react';
-import axios from 'axios';
+import api from '../services/api';
 
 export function AiAdvisorTab({ kasir }) {
   const transactions = kasir?.transactions || [];
@@ -112,7 +112,7 @@ export function AiAdvisorTab({ kasir }) {
 
       const promptWithContext = `[Kas Toko -> Income: Rp${totalIncome}, Expense: Rp${totalExpense}, Profit: Rp${netProfit}]\nPertanyaan: ${userText}`;
       
-      const res = await axios.post('/api/v1/ai/chat', {
+      const res = await api.post('/api/v1/ai/chat', {
         message: promptWithContext,
         history: formattedHistory,
         systemInstruction: 'Nama kamu Nusa, asisten keuangan UMKM POS NusaKas. Jawablah dengan ringkas, ramah, padat, langsung ke poin utama, dan gunakan format markdown sederhana yang rapi.'
@@ -145,7 +145,7 @@ export function AiAdvisorTab({ kasir }) {
     setTargetResult('');
     try {
       const prompt = `Asisten bisnis. Target Laba: Rp ${Number(targetAmount).toLocaleString('id-ID')}. Kas: Pemasukan Rp ${totalIncome}, Pengeluaran Rp ${totalExpense}. Berikan estimasi porsi/cup terjual per hari dan rekomendasi promo singkat.`;
-      const res = await axios.post('/api/v1/ai/generate', { prompt });
+      const res = await api.post('/api/v1/ai/generate', { prompt });
       setTargetResult(res.data.text);
     } catch (err) {
       console.error(err);
@@ -161,7 +161,7 @@ export function AiAdvisorTab({ kasir }) {
     try {
       const promptData = { totalIncome, totalExpense, netProfit, transactionCount: transactions.length, recentTransactions: transactions.slice(-10) };
       const prompt = `Konsultan Keuangan UMKM POS NusaKas. Analisis data kas: ${JSON.stringify(promptData)}. Berikan ringkasan singkat status kas, potensi pemborosan, dan 2 saran aksi cepat.`;
-      const res = await axios.post('/api/v1/ai/generate', { prompt });
+      const res = await api.post('/api/v1/ai/generate', { prompt });
       setAiAnalysis(res.data.text);
     } catch (err) {
       console.error(err);
@@ -211,7 +211,7 @@ export function AiAdvisorTab({ kasir }) {
           <div>
             <button 
               onClick={handleCreateNewChat}
-              className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs rounded-2xl flex items-center justify-center gap-2 transition active:scale-95 mb-4 border border-emerald-100/60 shadow-2xs"
+              className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-black text-xs rounded-2xl flex items-center justify-center gap-2 transition active:scale-95 mb-4 border border-emerald-100/60 shadow-2xs cursor-pointer"
             >
               <MessageSquarePlus size={16} /> Chat Baru
             </button>
@@ -234,7 +234,7 @@ export function AiAdvisorTab({ kasir }) {
                   </div>
                   <button 
                     onClick={(e) => handleDeleteSession(session.id, e)}
-                    className="opacity-100 lg:opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition"
+                    className="opacity-100 lg:opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                   >
                     <Trash2 size={13} />
                   </button>

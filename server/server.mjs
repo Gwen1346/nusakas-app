@@ -15,8 +15,9 @@ app.use(cors());
 const PORT = process.env.PORT || 5000;
 const DB_PATH = path.resolve('db.json');
 
-// Inisialisasi Google GenAI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Inisialisasi Google GenAI (Mendukung GEMINI_API_KEY maupun VITE_GEMINI_API_KEY)
+const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(apiKey || '');
 
 // Helper baca/tulis database JSON lokal
 const readDB = () => {
@@ -146,6 +147,12 @@ app.delete('/api/v1/transactions/:id', verifyToken, (req, res) => {
 app.post('/api/v1/ai/chat', verifyToken, async (req, res) => {
   try {
     const { message, history, systemInstruction } = req.body;
+    
+    // Pastikan API key terbaca
+    if (!apiKey) {
+      throw new Error("API Key Gemini belum dikonfigurasi di file .env");
+    }
+
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-3.6-flash',
       systemInstruction: systemInstruction || 'Nama kamu Nusa, asisten keuangan UMKM POS.'
@@ -155,20 +162,25 @@ app.post('/api/v1/ai/chat', verifyToken, async (req, res) => {
     const result = await chat.sendMessage(message);
     res.json({ success: true, text: result.response.text() });
   } catch (err) {
-    console.error("AI Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("AI Chat Error Detail:", err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan pada AI' });
   }
 });
 
 app.post('/api/v1/ai/generate', verifyToken, async (req, res) => {
   try {
     const { prompt } = req.body;
+
+    if (!apiKey) {
+      throw new Error("API Key Gemini belum dikonfigurasi di file .env");
+    }
+
     const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
     const result = await model.generateContent(prompt);
     res.json({ success: true, text: result.response.text() });
   } catch (err) {
-    console.error("AI Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("AI Generate Error Detail:", err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan pada AI' });
   }
 });
 
