@@ -7,18 +7,17 @@ import { ReportTab } from './components/ReportTab';
 import { AiAdvisorTab } from './components/AiAdvisorTab';
 import { Modals } from './components/Modals';
 import { LogoutModal } from './components/LogoutModal';
-import AuthModal from './components/AuthModal'; // Komponen login/register baru
+import AuthModal from './components/AuthModal';
 import { useKasir } from './hooks/useKasir';
 import { Menu } from 'lucide-react';
 
 export default function App() {
-  const [user, setUser] = useState(null); // State user login
+  const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('landing');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const kasir = useKasir();
 
-  // Cek sesi login saat aplikasi pertama kali dibuka
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
@@ -35,15 +34,11 @@ export default function App() {
     setShowLogoutModal(false);
     window.location.reload();
   };
-
-  // Jika user belum login dan mencoba masuk ke dashboard/aplikasi, paksa tampilkan AuthModal atau biarkan di landing
-  // Di sini kita biarkan user melihat landing page, lalu saat klik "Mulai", jika belum login bisa diarahkan ke modal login.
   
   if (activeTab === 'landing') {
     return (
       <div className="min-h-screen bg-slate-50 font-sans">
         <LandingTab onGetStarted={() => {
-          // Jika belum login, arahkan ke login, jika sudah langsung ke dashboard
           if (!user) {
             setActiveTab('login-required');
           } else {
@@ -51,21 +46,20 @@ export default function App() {
           }
         }} />
         
-        {/* Modal Login jika user dari landing ingin mulai tapi belum login */}
         {activeTab === 'login-required' && (
           <AuthModal 
             onLoginSuccess={(userData) => {
               setUser(userData);
               kasir.fetchTransactions();
               setActiveTab('dashboard');
-            }} 
+            }}
+            onClose={() => setActiveTab('landing')} 
           />
         )}
       </div>
     );
   }
 
-  // Jika belum login sama sekali tapi memaksa masuk rute lain
   if (!user) {
     return (
       <AuthModal 
@@ -73,7 +67,8 @@ export default function App() {
           setUser(userData);
           kasir.fetchTransactions();
           setActiveTab('dashboard');
-        }} 
+        }}
+        onClose={() => setActiveTab('landing')} 
       />
     );
   }
@@ -87,7 +82,6 @@ export default function App() {
         />
       )}
 
-      {/* Sidebar hanya muncul setelah user masuk dashboard/aplikasi */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen md:sticky md:top-0 border-r border-slate-200 flex flex-col ${
         isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       }`}>

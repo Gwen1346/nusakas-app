@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Mail, Lock, Store, Eye, EyeOff, Loader2, ArrowRight, TrendingUp, Wallet, Receipt } from 'lucide-react';
+import { Mail, Lock, Store, Eye, EyeOff, Loader2, ArrowRight, TrendingUp, Wallet, Receipt, X } from 'lucide-react';
+import logoPutih from '../assets/logoputih.png';
 
-export default function AuthModal({ onLoginSuccess }) {
+export default function AuthModal({ onLoginSuccess, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,7 +41,7 @@ export default function AuthModal({ onLoginSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-50 flex flex-col md:flex-row overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-50 flex flex-col md:flex-row overflow-y-auto z-50">
       <style>{`
         @keyframes authFadeUp {
           from { opacity: 0; transform: translateY(14px); }
@@ -88,7 +89,6 @@ export default function AuthModal({ onLoginSuccess }) {
 
       {/* ================= PANEL KIRI: BRAND ================= */}
       <div className="relative shrink-0 md:w-[44%] md:h-full bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-900 text-white overflow-hidden">
-        {/* Dekorasi grafik pertumbuhan yang 'tergambar' saat halaman terbuka */}
         <svg
           className="absolute -right-16 -bottom-10 w-[420px] h-[420px] opacity-[0.16] pointer-events-none"
           viewBox="0 0 400 400"
@@ -109,15 +109,13 @@ export default function AuthModal({ onLoginSuccess }) {
         <div className="auth-orb absolute right-8 top-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full p-8 sm:p-10 md:p-12 py-10 md:py-12">
-          <div className="auth-fade-up flex items-center gap-3" style={{ animationDelay: '0.05s' }}>
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md flex items-center justify-center font-black text-lg">
-              N
-            </div>
-            <div>
-              <div className="font-extrabold text-base tracking-tight leading-none">
+          <div className="auth-fade-up flex items-center gap-3.5" style={{ animationDelay: '0.05s' }}>
+            <img src={logoPutih} alt="NusaKas Logo" className="w-12 h-12 object-contain rounded-xl shadow-md" />
+            <div className="flex flex-col justify-center">
+              <div className="font-extrabold text-lg tracking-tight leading-snug">
                 Nusa<span className="text-emerald-300">Kas</span>
               </div>
-              <span className="text-[9px] text-emerald-200/70 font-semibold tracking-wider uppercase">
+              <span className="text-[10px] text-emerald-200/70 font-semibold tracking-wider uppercase leading-none mt-0.5">
                 POS & Fintech
               </span>
             </div>
@@ -147,9 +145,19 @@ export default function AuthModal({ onLoginSuccess }) {
       </div>
 
       {/* ================= PANEL KANAN: FORM ================= */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2.5 rounded-2xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition flex items-center justify-center cursor-pointer"
+            title="Kembali"
+          >
+            <X size={20} />
+          </button>
+        )}
+
         <div className="auth-fade-up w-full max-w-sm" style={{ animationDelay: '0.2s' }}>
-          {/* Toggle Masuk / Daftar dengan indikator yang geser */}
           <div className="relative flex items-center p-1 bg-slate-100 rounded-2xl mb-8 w-56">
             <div
               className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-xl shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -191,7 +199,6 @@ export default function AuthModal({ onLoginSuccess }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Field Nama Toko: muncul/hilang dengan transisi tinggi yang halus, bukan langsung lompat */}
             <div className={`auth-extra-field ${!isLogin ? 'is-open' : ''}`}>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
