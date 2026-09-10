@@ -11,6 +11,18 @@
       "name": "Cafe Moon",
       "email": "moon@gmail.com",
       "password": "$2b$10$5Ct/2xW5MhCR8lxwsyaT1.lHv3MG/AYlACQof5aElz7r1KevKhRV2"
+    },
+    {
+      "id": "1789021183693",
+      "name": "Cake Gwen",
+      "email": "cake@gmail.com",
+      "password": "$2b$10$F0dBOvsJzHhF3O4.1ilMFud6YhVHW.1h5Bg2VfxxsFqDvRgHO5vHu"
+    },
+    {
+      "id": "1789021359680",
+      "name": "Warung Elsa",
+      "email": "elsa@gmail.com",
+      "password": "$2b$10$8xd2OHcGI0WgIBmZLZyrtOUgON4kNV0YtWSvVO7nX/f6.fYGqpYsy"
     }
   ],
   "transactions": [
