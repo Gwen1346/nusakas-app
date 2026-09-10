@@ -56,6 +56,7 @@ export default function App() {
           <AuthModal 
             onLoginSuccess={(userData) => {
               setUser(userData);
+              kasir.fetchTransactions();
               setActiveTab('dashboard');
             }} 
           />
@@ -70,6 +71,7 @@ export default function App() {
       <AuthModal 
         onLoginSuccess={(userData) => {
           setUser(userData);
+          kasir.fetchTransactions();
           setActiveTab('dashboard');
         }} 
       />

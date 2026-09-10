@@ -108,7 +108,7 @@ app.get('/api/v1/transactions', verifyToken, (req, res) => {
 
 // 4. Tambah transaksi baru untuk user yang login
 app.post('/api/v1/transactions', verifyToken, (req, res) => {
-  const { name, type, category, price, qty } = req.body;
+  const { name, type, category, price, qty, date } = req.body;
   if (!name || !type || !price) {
     return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
   }
@@ -122,13 +122,39 @@ app.post('/api/v1/transactions', verifyToken, (req, res) => {
     category,
     price: Number(price),
     qty: Number(qty) || 1,
-    date: new Date().toISOString().split('T')[0]
+    date: date || new Date().toISOString().split('T')[0]
   };
 
   db.transactions.push(newTx);
   writeDB(db);
 
   res.status(201).json({ success: true, data: newTx });
+});
+
+// 4b. Edit transaksi milik user yang login
+app.put('/api/v1/transactions/:id', verifyToken, (req, res) => {
+  const { id } = req.params;
+  const { name, type, category, price, qty, date } = req.body;
+
+  const db = readDB();
+  const index = db.transactions.findIndex((t) => t.id === Number(id) && t.userId === req.user.id);
+
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: 'Transaksi tidak ditemukan' });
+  }
+
+  db.transactions[index] = {
+    ...db.transactions[index],
+    name: name ?? db.transactions[index].name,
+    type: type ?? db.transactions[index].type,
+    category: category ?? db.transactions[index].category,
+    price: price !== undefined ? Number(price) : db.transactions[index].price,
+    qty: qty !== undefined ? Number(qty) : db.transactions[index].qty,
+    date: date ?? db.transactions[index].date
+  };
+  writeDB(db);
+
+  res.json({ success: true, data: db.transactions[index] });
 });
 
 // 5. Hapus transaksi
