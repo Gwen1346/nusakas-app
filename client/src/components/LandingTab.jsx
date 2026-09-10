@@ -5,7 +5,7 @@ import {
   Bot, ShieldCheck, Smile, Users, Star, Clock, Sparkles, 
   Mail, Phone, MapPin 
 } from 'lucide-react';
-import logoNusa from '../assets/logoNusa.png';
+import logoPutih from '../assets/logoputih.png';
 import heroImg from '../assets/hero.png';
 
 export function LandingTab({ onGetStarted }) {
@@ -19,14 +19,18 @@ export function LandingTab({ onGetStarted }) {
       {/* 1. NAVBAR */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 lg:px-16 py-4 flex items-center justify-between transition-all shadow-xs">
         <div className="flex items-center gap-3 group cursor-pointer">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-md shadow-emerald-600/20 bg-emerald-600 flex items-center justify-center transform group-hover:rotate-12 transition duration-300">
-            <img src={logoNusa} alt="Logo" className="w-14 h-14 object-cover transform -translate-y-0.5" />
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center">
+            <img 
+              src={logoPutih} 
+              alt="NusaKas Logo" 
+              className="w-16 h-16 max-w-none object-cover transform -translate-y-0.5" 
+            />
           </div>
           <div className="flex flex-col justify-center">
             <div className="font-extrabold text-base leading-tight tracking-tight">
               <span className="text-[#064E3B]">Nusa</span><span className="text-[#10B981]">Kas</span>
             </div>
-            <span className="text-[8px] text-slate-400 font-bold tracking-widest uppercase">POS & FINTECH</span>
+            <span className="text-[9px] text-slate-400 font-semibold tracking-wider uppercase">POS & Fintech</span>
           </div>
         </div>
 
@@ -238,7 +242,7 @@ export function LandingTab({ onGetStarted }) {
           <div className="md:col-span-5 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl overflow-hidden bg-emerald-600 flex items-center justify-center shadow-md shadow-emerald-600/20">
-                <img src={logoNusa} alt="Logo" className="w-14 h-14 object-cover transform -translate-y-0.5" />
+                <img src={logoPutih} alt="Logo" className="w-14 h-14 object-cover transform -translate-y-0.5" />
               </div>
               <div className="font-extrabold text-base tracking-tight">
                 <span className="text-[#064E3B]">Nusa</span><span className="text-[#10B981]">Kas</span>

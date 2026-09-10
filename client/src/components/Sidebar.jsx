@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import React from 'react';
 import { LayoutDashboard, Receipt, Bot, Sparkles, LogOut, X } from 'lucide-react';
-import logoNusa from '../assets/logoNusa.png';
+import logoPutih from '../assets/logoputih.png';
 
 export function Sidebar({ activeTab, setActiveTab, setIsMobileSidebarOpen, onOpenLogoutModal }) {
   return (
@@ -10,11 +10,11 @@ export function Sidebar({ activeTab, setActiveTab, setIsMobileSidebarOpen, onOpe
         {/* Header Logo & Close Button (Mobile) */}
         <div className="flex items-center justify-between px-1 mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl overflow-hidden shrink-0 shadow-sm bg-emerald-600 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center">
               <img 
-                src={logoNusa} 
+                src={logoPutih} 
                 alt="NusaKas Logo" 
-                className="w-14 h-14 max-w-none object-cover transform -translate-y-0.5" 
+                className="w-16 h-16 max-w-none object-cover transform -translate-y-0.5" 
               />
             </div>
             <div className="flex flex-col justify-center">

@@ -109,13 +109,15 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
         <div className="auth-orb absolute right-8 top-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between h-full p-8 sm:p-10 md:p-12 py-10 md:py-12">
-          <div className="auth-fade-up flex items-center gap-3.5" style={{ animationDelay: '0.05s' }}>
-            <img src={logoPutih} alt="NusaKas Logo" className="w-12 h-12 object-contain rounded-xl shadow-md" />
+          <div className="auth-fade-up flex items-center gap-3" style={{ animationDelay: '0.05s' }}>
+            <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center">
+              <img src={logoPutih} alt="NusaKas Logo" className="w-16 h-16 max-w-none object-cover transform -translate-y-0.5" />
+            </div>
             <div className="flex flex-col justify-center">
-              <div className="font-extrabold text-lg tracking-tight leading-snug">
+              <div className="font-extrabold text-base leading-tight tracking-tight">
                 Nusa<span className="text-emerald-300">Kas</span>
               </div>
-              <span className="text-[10px] text-emerald-200/70 font-semibold tracking-wider uppercase leading-none mt-0.5">
+              <span className="text-[9px] text-emerald-200/70 font-semibold tracking-wider uppercase">
                 POS & Fintech
               </span>
             </div>
