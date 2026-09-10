@@ -5,7 +5,24 @@
       "name": "Gwen Mart",
       "email": "gwen@gmail.com",
       "password": "$2b$10$.OjMR/IU1yaT4cg/KXsES.CyEij.dTdf8dRdDa2b6DnbyZ3QLzxma"
+    },
+    {
+      "id": "1789016136795",
+      "name": "Cafe Moon",
+      "email": "moon@gmail.com",
+      "password": "$2b$10$5Ct/2xW5MhCR8lxwsyaT1.lHv3MG/AYlACQof5aElz7r1KevKhRV2"
     }
   ],
-  "transactions": []
+  "transactions": [
+    {
+      "id": 1789016065178,
+      "userId": "1789013553895",
+      "name": "Kopi Gula Aren",
+      "type": "INCOME",
+      "category": "Minuman",
+      "price": 15000,
+      "qty": 1,
+      "date": "2026-09-10"
+    }
+  ]
 }
