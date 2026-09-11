@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Mail, Lock, Store, Eye, EyeOff, Loader2, ArrowRight, TrendingUp, Wallet, Receipt, X } from 'lucide-react';
 import logoPutih from '../assets/logoputih.png';
 
@@ -17,13 +17,11 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
     setError('');
     setLoading(true);
 
-    const endpoint = isLogin
-      ? 'http://localhost:5000/api/v1/auth/login'
-      : 'http://localhost:5000/api/v1/auth/register';
+    const endpoint = isLogin ? '/auth/login' : '/auth/register';
 
     try {
       const payload = isLogin ? { email, password } : { name, email, password };
-      const response = await axios.post(endpoint, payload);
+      const response = await api.post(endpoint, payload);
 
       if (isLogin) {
         localStorage.setItem('token', response.data.token);
@@ -34,7 +32,13 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
         setIsLogin(true);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Terjadi kesalahan pada server');
+      if (err.response) {
+        setError(err.response.data?.message || 'Terjadi kesalahan pada server');
+      } else if (err.request) {
+        setError('Tidak bisa menghubungi server. Cek koneksi internet kamu, ya!');
+      } else {
+        setError('Terjadi kesalahan tak terduga.');
+      }
     } finally {
       setLoading(false);
     }
