@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../services/api';
-import { Mail, Lock, Store, Eye, EyeOff, Loader2, ArrowRight, TrendingUp, Wallet, Receipt, X } from 'lucide-react';
+import { Mail, Lock, Store, Eye, EyeOff, Loader2, ArrowRight, TrendingUp, Wallet, Receipt, X, CheckCircle2 } from 'lucide-react';
 import logoPutih from '../assets/logoputih.png';
 
 export default function AuthModal({ onLoginSuccess, onClose }) {
@@ -9,12 +9,14 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     const endpoint = isLogin ? '/auth/login' : '/auth/register';
@@ -28,7 +30,8 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         onLoginSuccess(response.data.user);
       } else {
-        alert('Registrasi berhasil! Silakan login.');
+        setSuccess('Registrasi berhasil! Silakan login dengan akun barumu.');
+        setPassword('');
         setIsLogin(true);
       }
     } catch (err) {
@@ -171,7 +174,7 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
             />
             <button
               type="button"
-              onClick={() => { setIsLogin(true); setError(''); }}
+              onClick={() => { setIsLogin(true); setError(''); setSuccess(''); }}
               className={`relative z-10 flex-1 py-2 rounded-xl text-xs font-bold transition-colors duration-300 ${
                 isLogin ? 'text-emerald-700' : 'text-slate-400'
               }`}
@@ -180,7 +183,7 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
             </button>
             <button
               type="button"
-              onClick={() => { setIsLogin(false); setError(''); }}
+              onClick={() => { setIsLogin(false); setError(''); setSuccess(''); }}
               className={`relative z-10 flex-1 py-2 rounded-xl text-xs font-bold transition-colors duration-300 ${
                 !isLogin ? 'text-emerald-700' : 'text-slate-400'
               }`}
@@ -201,6 +204,13 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
           {error && (
             <div className="auth-fade-up bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-2xl text-xs font-semibold mb-5">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="auth-fade-up bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-2xl text-xs font-semibold mb-5 flex items-center gap-2">
+              <CheckCircle2 size={16} className="shrink-0" />
+              {success}
             </div>
           )}
 
@@ -282,7 +292,7 @@ export default function AuthModal({ onLoginSuccess, onClose }) {
             {isLogin ? 'Belum punya akun? ' : 'Sudah punya akun? '}
             <button
               type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
               className="text-emerald-700 font-bold hover:underline"
             >
               {isLogin ? 'Daftar di sini' : 'Masuk di sini'}
