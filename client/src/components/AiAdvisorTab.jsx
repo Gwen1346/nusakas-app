@@ -365,9 +365,13 @@ export function AiAdvisorTab({ kasir, userId }) {
 
             <div className="space-y-3 mb-4">
               <input 
-                type="number"
-                value={targetAmount}
-                onChange={(e) => setTargetAmount(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={targetAmount ? Number(targetAmount).toLocaleString('id-ID') : ''}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, '');
+                  setTargetAmount(digitsOnly);
+                }}
                 placeholder="Masukkan nominal target"
                 className="w-full px-4 py-3 bg-slate-50/80 border border-slate-200/60 rounded-2xl text-xs font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
               />
