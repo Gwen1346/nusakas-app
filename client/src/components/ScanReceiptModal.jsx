@@ -1,6 +1,6 @@
 // src/components/ScanReceiptModal.jsx
-import React, { useRef, useState } from 'react';
-import { X, Camera, ImageUp, Loader2, Trash2, ScanLine, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Camera, ImageUp, Loader2, Trash2, ScanLine, AlertCircle, ChevronDown } from 'lucide-react';
 import api from '../services/api'; // Sesuaikan path ini kalau lokasi api.js kamu beda
 
 const CATEGORIES = ['Bahan Baku', 'Operasional', 'Minuman', 'Makanan', 'Lainnya'];
@@ -69,6 +69,56 @@ const formatRupiah = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 // Nominal di TransactionTab.jsx.
 const displayPrice = (n) => (n === '' || n === null || n === undefined ? '' : Number(n).toLocaleString('id-ID'));
 const parsePriceInput = (value) => value.replace(/\D/g, '');
+
+// Dropdown custom buat ganti <select> native -- <select> stylingnya (warna
+// background pas hover, dll) dikendalikan browser/OS dan gak bisa di-custom
+// penuh pakai Tailwind, jadi bikin sendiri biar konsisten sama desain modal.
+function CustomDropdown({ value, options, onChange, buttonClassName }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = options.find((o) => o.value === value) || options[0];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-400 ${buttonClassName}`}
+      >
+        <span className="truncate">{selected?.label}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-xs font-semibold transition ${
+                opt.value === value ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ScanReceiptModal({ onClose, onSaved }) {
   // step: 'upload' | 'loading' | 'review' | 'saving'
@@ -340,28 +390,26 @@ export function ScanReceiptModal({ onClose, onSaved }) {
                         className="col-span-1 px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         placeholder="Qty"
                       />
-                      <select
-                        value={it.type || 'EXPENSE'}
-                        onChange={(e) => updateItem(it._id, 'type', e.target.value)}
-                        className={`col-span-1 px-2 py-1.5 text-xs font-bold rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
-                          it.type === 'INCOME'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-rose-200 bg-rose-50 text-rose-600'
-                        }`}
-                      >
-                        {TYPE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={it.category}
-                        onChange={(e) => updateItem(it._id, 'category', e.target.value)}
-                        className="col-span-3 px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                      >
-                        {CATEGORIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                      <div className="col-span-1">
+                        <CustomDropdown
+                          value={it.type || 'EXPENSE'}
+                          onChange={(v) => updateItem(it._id, 'type', v)}
+                          options={TYPE_OPTIONS}
+                          buttonClassName={`text-xs font-bold ${
+                            it.type === 'INCOME'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              : 'border-rose-200 bg-rose-50 text-rose-600'
+                          }`}
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <CustomDropdown
+                          value={it.category}
+                          onChange={(v) => updateItem(it._id, 'category', v)}
+                          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                          buttonClassName="text-sm bg-white border-slate-200 text-slate-700"
+                        />
+                      </div>
                     </div>
                     <button
                       onClick={() => removeItem(it._id)}
