@@ -4,8 +4,12 @@ import ReactMarkdown from 'react-markdown';
 import { Send, Sparkles, MessageSquarePlus, MessageSquare, Trash2, Target, Lightbulb, Bot, Loader2, Zap } from 'lucide-react';
 import api from '../services/api';
 
-export function AiAdvisorTab({ kasir }) {
+export function AiAdvisorTab({ kasir, userId }) {
   const transactions = kasir?.transactions || [];
+
+  // Key riwayat chat WAJIB unik per user. Fallback 'guest' hanya jaga-jaga
+  // kalau userId belum tersedia saat render awal.
+  const storageKey = `nusakas_chat_sessions_${userId ?? 'guest'}`;
 
   const totalIncome = transactions
     .filter((t) => t.type === 'INCOME')
@@ -19,7 +23,7 @@ export function AiAdvisorTab({ kasir }) {
 
   // State Management Multi-Session Chatbot (Nusa)
   const [chatSessions, setChatSessions] = useState(() => {
-    const savedSessions = localStorage.getItem('nusakas_chat_sessions');
+    const savedSessions = localStorage.getItem(storageKey);
     if (savedSessions) {
       try { 
         const parsed = JSON.parse(savedSessions);
@@ -52,9 +56,36 @@ export function AiAdvisorTab({ kasir }) {
   const currentSession = chatSessions.find(s => s.id === activeSessionId) || chatSessions[0];
 
   useEffect(() => {
-    localStorage.setItem('nusakas_chat_sessions', JSON.stringify(chatSessions));
+    localStorage.setItem(storageKey, JSON.stringify(chatSessions));
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatSessions, activeSessionId]);
+  }, [chatSessions, activeSessionId, storageKey]);
+
+  // Kalau userId berubah (ganti akun tanpa reload penuh), muat ulang
+  // riwayat chat milik user yang baru, bukan nerusin state user lama.
+  useEffect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setChatSessions(parsed);
+          setActiveSessionId(parsed[0].id);
+          return;
+        }
+      } catch (e) {
+        console.error('Gagal memuat riwayat sesi chat:', e);
+      }
+    }
+    const defaultId = Date.now().toString();
+    const freshSession = {
+      id: defaultId,
+      title: 'Percakapan Baru',
+      messages: [{ sender: 'nusa', text: 'Halo! Aku **Nusa**, asisten keuangan pribadi toko kamu! 🚀 Ada yang bisa Nusa bantu hari ini?' }]
+    };
+    setChatSessions([freshSession]);
+    setActiveSessionId(defaultId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const handleCreateNewChat = () => {
     const newId = Date.now().toString();

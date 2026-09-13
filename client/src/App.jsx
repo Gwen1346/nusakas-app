@@ -30,6 +30,9 @@ export default function App() {
   const handleConfirmLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Bersihkan sisa key lama (sebelum fix) yang tidak ter-scope per user,
+    // supaya tidak nyangkut dan kebaca oleh akun lain di browser yang sama.
+    localStorage.removeItem('nusakas_chat_sessions');
     setUser(null);
     setActiveTab('landing');
     setShowLogoutModal(false);
@@ -115,7 +118,7 @@ export default function App() {
           {activeTab === 'dashboard' && <DashboardTab kasir={kasir} setActiveTab={setActiveTab} />}
           {activeTab === 'transaction' && <TransactionTab kasir={kasir} />}
           {activeTab === 'report' && <ReportTab kasir={kasir} />}
-          {activeTab === 'ai' && <AiAdvisorTab kasir={kasir} />}
+          {activeTab === 'ai' && <AiAdvisorTab kasir={kasir} userId={user?.id ?? user?._id ?? user?.email} />}
         </main>
       </div>
 
