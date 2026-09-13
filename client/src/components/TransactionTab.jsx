@@ -2,9 +2,30 @@
 import React from 'react';
 import { Sparkles, Trash2, Edit2, Receipt, Loader2 } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
-import { CATEGORY_OPTIONS, TYPE_OPTIONS } from '../utils/transactionMeta';
+import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, TYPE_OPTIONS } from '../utils/transactionMeta';
+
+const DEFAULT_CATEGORY_NAMES = Object.keys(DEFAULT_CATEGORY_COLORS);
 
 export function TransactionTab({ kasir }) {
+  // Kategori sekarang dinamis: default (Minuman, Makanan, dll) + custom yang
+  // ditambahkan user sendiri lewat dropdown. Disimpan di backend (Supabase),
+  // jadi sinkron di semua device — dikelola lewat useKasir.js.
+  const { categories, categoryColors, addCategory, customCategories, hideDefaultCategory, deleteCategory } = kasir;
+
+  // Kategori default & custom sama-sama bisa dihapus dari dropdown, tapi lewat
+  // endpoint yang beda: default cuma "disembunyikan" per akun, custom beneran dihapus.
+  const handleDeleteCategoryOption = (value) => {
+    if (DEFAULT_CATEGORY_NAMES.includes(value)) {
+      hideDefaultCategory(value);
+    } else {
+      const row = customCategories.find(c => c.name === value);
+      if (row) deleteCategory(row.id);
+    }
+    if (kasir.formCategory === value) {
+      kasir.setFormCategory('');
+    }
+  };
+
   const filteredList = kasir.transactions.filter(item => {
     const searchVal = (kasir.tableSearch || '').toLowerCase();
     const matchSearch = (item.name || '').toLowerCase().includes(searchVal) ||
@@ -75,7 +96,10 @@ export function TransactionTab({ kasir }) {
               label="Kategori"
               value={kasir.formCategory}
               onChange={kasir.setFormCategory}
-              options={CATEGORY_OPTIONS}
+              options={categories}
+              categoryColors={categoryColors}
+              onAddNew={addCategory}
+              onDeleteOption={handleDeleteCategoryOption}
               colored
             />
             <div>

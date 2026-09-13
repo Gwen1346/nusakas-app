@@ -1,7 +1,63 @@
 // src/components/DashboardTab.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Wallet, ArrowUpRight, ArrowDownRight, PieChart, Receipt, ArrowRight } from 'lucide-react';
 import { CATEGORY_COLORS, FALLBACK_COLOR, getLast7Days } from '../utils/transactionMeta';
+
+const PERIOD_OPTIONS = [
+  { value: 'today', label: 'Hari Ini' },
+  { value: 'week', label: 'Minggu Ini' },
+  { value: 'month', label: 'Bulan Ini' },
+  { value: 'all', label: 'Semua' },
+];
+
+// Cek apakah sebuah tanggal transaksi (string 'YYYY-MM-DD') masuk ke periode yang dipilih
+function isInPeriod(dateStr, period) {
+  if (period === 'all') return true;
+  if (!dateStr) return false;
+
+  const date = new Date(dateStr);
+  const now = new Date();
+
+  if (period === 'today') {
+    return dateStr === now.toISOString().split('T')[0];
+  }
+
+  if (period === 'week') {
+    const startOfWeek = new Date(now);
+    const day = startOfWeek.getDay(); // 0 = Minggu ... 6 = Sabtu
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+    return date >= startOfWeek && date <= now;
+  }
+
+  if (period === 'month') {
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }
+
+  return true;
+}
+
+/* ---------- Toggle segmented untuk pilih periode ringkasan ---------- */
+function PeriodToggle({ value, onChange }) {
+  return (
+    <div className="inline-flex items-center gap-0.5 p-1 bg-slate-100 rounded-xl">
+      {PERIOD_OPTIONS.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition ${
+            value === opt.value
+              ? 'bg-white text-emerald-700 shadow-xs'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /* ---------- Kartu Statistik gaya TailAdmin ---------- */
 function StatCard({ label, value, sub, icon, iconBg, iconColor, badge, badgeTone }) {
@@ -97,7 +153,7 @@ function CashFlowChart({ transactions }) {
 }
 
 /* ---------- Donut breakdown pengeluaran per kategori ---------- */
-function CategoryDonut({ transactions }) {
+function CategoryDonut({ transactions, periodLabel }) {
   const expenseItems = transactions.filter(t => t.type === 'EXPENSE');
   const totalExpense = expenseItems.reduce((a, c) => a + Number(c.price), 0);
 
@@ -113,6 +169,7 @@ function CategoryDonut({ transactions }) {
     return (
       <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-xs h-full flex flex-col">
         <h3 className="font-bold text-xs sm:text-sm text-slate-800">Pengeluaran per Kategori</h3>
+        {periodLabel && <p className="text-[11px] text-slate-400 mt-0.5">{periodLabel}</p>}
         <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8">
           <div className="w-11 h-11 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center">
             <PieChart size={20} />
@@ -136,7 +193,8 @@ function CategoryDonut({ transactions }) {
 
   return (
     <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-xs h-full">
-      <h3 className="font-bold text-xs sm:text-sm text-slate-800 mb-5">Pengeluaran per Kategori</h3>
+      <h3 className="font-bold text-xs sm:text-sm text-slate-800">Pengeluaran per Kategori</h3>
+      {periodLabel && <p className="text-[11px] text-slate-400 mt-0.5 mb-4">{periodLabel}</p>}
 
       <div className="flex items-center gap-6">
         <div
@@ -231,11 +289,15 @@ function RecentTransactionsPreview({ transactions, onSeeAll }) {
 }
 
 export function DashboardTab({ kasir, setActiveTab }) {
-  const totalIncome = kasir.transactions
+  const [period, setPeriod] = useState('today');
+
+  const periodTransactions = kasir.transactions.filter(t => isInPeriod(t.date, period));
+
+  const totalIncome = periodTransactions
     .filter(t => t.type === 'INCOME')
     .reduce((acc, curr) => acc + Number(curr.price), 0);
 
-  const totalExpense = kasir.transactions
+  const totalExpense = periodTransactions
     .filter(t => t.type === 'EXPENSE')
     .reduce((acc, curr) => acc + Number(curr.price), 0);
 
@@ -244,13 +306,7 @@ export function DashboardTab({ kasir, setActiveTab }) {
   const incomeShare = (totalIncome + totalExpense) > 0 ? Math.round((totalIncome / (totalIncome + totalExpense)) * 100) : 0;
   const expenseShare = (totalIncome + totalExpense) > 0 ? Math.round((totalExpense / (totalIncome + totalExpense)) * 100) : 0;
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayIncome = kasir.transactions
-    .filter(t => t.type === 'INCOME' && t.date === today)
-    .reduce((a, c) => a + Number(c.price), 0);
-  const todayExpense = kasir.transactions
-    .filter(t => t.type === 'EXPENSE' && t.date === today)
-    .reduce((a, c) => a + Number(c.price), 0);
+  const periodLabel = PERIOD_OPTIONS.find(o => o.value === period)?.label || '';
 
   return (
     <div className="max-w-7xl mx-auto space-y-5 pb-12">
@@ -273,13 +329,19 @@ export function DashboardTab({ kasir, setActiveTab }) {
         </button>
       </div>
 
+      {/* Toggle Periode Ringkasan */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ringkasan {periodLabel}</h2>
+        <PeriodToggle value={period} onChange={setPeriod} />
+      </div>
+
       {/* Kartu Statistik gaya TailAdmin */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="col-span-2 sm:col-span-1">
           <StatCard
             label="Net Profit"
             value={`Rp ${netProfit.toLocaleString('id-ID')}`}
-            sub={totalIncome > 0 ? `Margin ${margin}% dari pemasukan` : `${kasir.transactions.length} transaksi tercatat`}
+            sub={totalIncome > 0 ? `Margin ${margin}% dari pemasukan` : `${periodTransactions.length} transaksi tercatat`}
             icon={<Wallet size={18} />}
             iconBg="bg-blue-50"
             iconColor="text-blue-600"
@@ -290,7 +352,7 @@ export function DashboardTab({ kasir, setActiveTab }) {
         <StatCard
           label="Masuk"
           value={`Rp ${totalIncome.toLocaleString('id-ID')}`}
-          sub={`Hari ini: Rp ${todayIncome.toLocaleString('id-ID')}`}
+          sub={`${periodLabel} · ${incomeShare > 0 ? `${incomeShare}% dari arus kas` : 'belum ada'}`}
           icon={<ArrowUpRight size={18} />}
           iconBg="bg-emerald-50"
           iconColor="text-emerald-600"
@@ -300,7 +362,7 @@ export function DashboardTab({ kasir, setActiveTab }) {
         <StatCard
           label="Keluar"
           value={`Rp ${totalExpense.toLocaleString('id-ID')}`}
-          sub={`Hari ini: Rp ${todayExpense.toLocaleString('id-ID')}`}
+          sub={`${periodLabel} · ${expenseShare > 0 ? `${expenseShare}% dari arus kas` : 'belum ada'}`}
           icon={<ArrowDownRight size={18} />}
           iconBg="bg-rose-50"
           iconColor="text-rose-600"
@@ -315,7 +377,7 @@ export function DashboardTab({ kasir, setActiveTab }) {
           <CashFlowChart transactions={kasir.transactions} />
         </div>
         <div className="lg:col-span-2">
-          <CategoryDonut transactions={kasir.transactions} />
+          <CategoryDonut transactions={periodTransactions} periodLabel={periodLabel} />
         </div>
       </div>
 

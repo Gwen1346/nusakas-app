@@ -170,6 +170,121 @@ app.delete('/api/v1/transactions/:id', verifyToken, async (req, res) => {
   }
 });
 
+// ================= CATEGORY ENDPOINTS (Kategori Custom, Multi-User) =================
+// Kategori DEFAULT (Minuman, Makanan, dll) tetap hardcode di frontend (transactionMeta.js).
+// Tabel `categories` ini cuma nyimpen kategori CUSTOM yang ditambahin user sendiri,
+// supaya user F&B lama gak butuh migrasi data apa-apa.
+
+const DEFAULT_CATEGORY_NAMES = ['Minuman', 'Makanan', 'Bahan Baku', 'Operasional', 'Lainnya'];
+const CATEGORY_COLOR_PALETTE = [
+  '#0ea5e9', '#ec4899', '#14b8a6', '#f97316',
+  '#8b5cf6', '#ef4444', '#22c55e', '#eab308',
+  '#06b6d4', '#d946ef',
+];
+
+app.get('/api/v1/categories', verifyToken, async (req, res) => {
+  try {
+    // Return semua baris: baik kategori custom (ishidden=false) maupun
+    // "penanda" kategori default yang disembunyikan user (ishidden=true)
+    const result = await pool.query(
+      'SELECT * FROM categories WHERE userId = $1 ORDER BY createdAt ASC',
+      [req.user.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Categories Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data kategori' });
+  }
+});
+
+app.post('/api/v1/categories', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ success: false, message: 'Nama kategori tidak boleh kosong' });
+    }
+
+    const existingRows = await pool.query(
+      'SELECT * FROM categories WHERE userId = $1',
+      [req.user.id]
+    );
+    const hiddenDefaultNames = existingRows.rows.filter(r => r.ishidden).map(r => r.name.toLowerCase());
+    const visibleCustomRows = existingRows.rows.filter(r => !r.ishidden);
+    const customNames = visibleCustomRows.map(r => r.name.toLowerCase());
+
+    const isVisibleDefault = DEFAULT_CATEGORY_NAMES.some(n => n.toLowerCase() === trimmed.toLowerCase())
+      && !hiddenDefaultNames.includes(trimmed.toLowerCase());
+
+    if (isVisibleDefault || customNames.includes(trimmed.toLowerCase())) {
+      // Sudah ada & masih kelihatan -> anggap sukses, biar frontend tetap bisa langsung pilih kategori ini
+      return res.status(200).json({ success: true, data: { name: trimmed, alreadyExists: true } });
+    }
+
+    const color = CATEGORY_COLOR_PALETTE[visibleCustomRows.length % CATEGORY_COLOR_PALETTE.length];
+    const newCatId = Date.now();
+    await pool.query(
+      'INSERT INTO categories (id, userId, name, color, ishidden) VALUES ($1, $2, $3, $4, false)',
+      [newCatId, req.user.id, trimmed, color]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { id: newCatId, userId: req.user.id, name: trimmed, color, ishidden: false }
+    });
+  } catch (error) {
+    console.error('Add Category Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menambah kategori' });
+  }
+});
+
+// Sembunyikan kategori DEFAULT (Minuman, Makanan, dll) khusus untuk user ini.
+// Ini bukan hapus permanen dari sistem -- cuma bikin "penanda" per-user, jadi
+// gampang dipulihkan lagi (tinggal hapus penandanya lewat DELETE /categories/:id).
+app.post('/api/v1/categories/hide-default', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const trimmed = (name || '').trim();
+    const isDefault = DEFAULT_CATEGORY_NAMES.some(n => n.toLowerCase() === trimmed.toLowerCase());
+    if (!isDefault) {
+      return res.status(400).json({ success: false, message: 'Kategori ini bukan kategori default' });
+    }
+
+    const existing = await pool.query(
+      'SELECT * FROM categories WHERE userId = $1 AND LOWER(name) = LOWER($2) AND ishidden = true',
+      [req.user.id, trimmed]
+    );
+    if (existing.rows.length > 0) {
+      return res.json({ success: true, data: existing.rows[0] });
+    }
+
+    const newId = Date.now();
+    await pool.query(
+      'INSERT INTO categories (id, userId, name, color, ishidden) VALUES ($1, $2, $3, $4, true)',
+      [newId, req.user.id, trimmed, '']
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { id: newId, userId: req.user.id, name: trimmed, color: '', ishidden: true }
+    });
+  } catch (error) {
+    console.error('Hide Default Category Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menyembunyikan kategori' });
+  }
+});
+
+app.delete('/api/v1/categories/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM categories WHERE id = $1 AND userId = $2', [id, req.user.id]);
+    res.json({ success: true, message: 'Kategori berhasil dihapus' });
+  } catch (error) {
+    console.error('Delete Category Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menghapus kategori' });
+  }
+});
+
 // ================= AI ENDPOINTS (Nusa Advisor) =================
 
 app.post('/api/v1/ai/chat', verifyToken, async (req, res) => {

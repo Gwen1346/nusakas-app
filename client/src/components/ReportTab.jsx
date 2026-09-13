@@ -1,6 +1,6 @@
 // src/components/ReportTab.jsx
 import React from 'react';
-import { FileSpreadsheet, Printer, Search, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { FileSpreadsheet, FileText, Search, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export function ReportTab({ kasir }) {
   return (
@@ -8,22 +8,24 @@ export function ReportTab({ kasir }) {
       {/* Header Banner Modern */}
       <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-100 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Laporan Kas Toko</h2>
             <p className="text-xs text-slate-400 font-medium">Rekapitulasi seluruh pemasukan dan pengeluaran.</p>
           </div>
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto min-w-0">
             <button 
               onClick={kasir.handleExportExcel} 
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+              className="min-w-0 flex-1 sm:flex-initial px-3 sm:px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
             >
-              <FileSpreadsheet size={15} /> Export Excel
+              <FileSpreadsheet size={15} className="shrink-0" />
+              <span className="truncate">Export Excel</span>
             </button>
             <button 
               onClick={kasir.handleExportPDF} 
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+              className="min-w-0 flex-1 sm:flex-initial px-3 sm:px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
             >
-              <Printer size={15} /> Cetak / PDF
+              <FileText size={15} className="shrink-0" />
+              <span className="truncate">Export PDF</span>
             </button>
           </div>
         </div>
