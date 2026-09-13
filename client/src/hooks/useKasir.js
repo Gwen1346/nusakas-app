@@ -7,6 +7,17 @@ import autoTable from 'jspdf-autotable';
 import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS } from '../utils/transactionMeta';
 
 export function useKasir() {
+  // Urutkan transaksi: tanggal terbaru dulu, kalau tanggal sama urutkan
+  // berdasarkan id (id = timestamp saat transaksi diinput, jadi urutan
+  // input tetap konsisten walau tanggalnya sama).
+  const sortTransactions = (list) => {
+    return [...list].sort((a, b) => {
+      const dateCompare = String(b.date).localeCompare(String(a.date));
+      if (dateCompare !== 0) return dateCompare;
+      return Number(b.id) - Number(a.id);
+    });
+  };
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -60,7 +71,7 @@ export function useKasir() {
     setTransactionError('');
     try {
       const res = await api.get('/transactions');
-      setTransactions(res.data.data || []);
+      setTransactions(sortTransactions(res.data.data || []));
     } catch (err) {
       console.error('Gagal mengambil data transaksi:', err);
       setTransactionError('Gagal memuat data transaksi. Coba refresh halaman.');
@@ -198,10 +209,10 @@ export function useKasir() {
     try {
       if (editingId) {
         const res = await api.put(`/transactions/${editingId}`, payload);
-        setTransactions(prev => prev.map(t => (t.id === editingId ? res.data.data : t)));
+        setTransactions(prev => sortTransactions(prev.map(t => (t.id === editingId ? res.data.data : t))));
       } else {
         const res = await api.post('/transactions', payload);
-        setTransactions(prev => [res.data.data, ...prev]);
+        setTransactions(prev => sortTransactions([res.data.data, ...prev]));
       }
       resetForm();
     } catch (err) {
