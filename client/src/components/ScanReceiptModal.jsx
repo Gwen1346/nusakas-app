@@ -4,6 +4,10 @@ import { X, Camera, ImageUp, Loader2, Trash2, ScanLine, AlertCircle } from 'luci
 import api from '../services/api'; // Sesuaikan path ini kalau lokasi api.js kamu beda
 
 const CATEGORIES = ['Bahan Baku', 'Operasional', 'Minuman', 'Makanan', 'Lainnya'];
+const TYPE_OPTIONS = [
+  { value: 'EXPENSE', label: 'Pengeluaran' },
+  { value: 'INCOME', label: 'Pemasukan' },
+];
 
 // Ubah File jadi base64 murni (tanpa prefix "data:image/...;base64,")
 function fileToBase64(file) {
@@ -15,7 +19,56 @@ function fileToBase64(file) {
   });
 }
 
+// Resize + kompres foto struk sebelum dikirim ke server, supaya payload kecil
+// (foto HP asli bisa 3-8MB, gampang kena limit ukuran request) dan upload lebih cepat.
+function compressImage(file, maxDimension = 1600, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) return reject(new Error('Gagal mengompres gambar'));
+          resolve(new File([blob], file.name || 'struk.jpg', { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Gagal memuat gambar'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 const formatRupiah = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+// Buat nampilin angka di input dengan pemisah ribuan (mis. "21.819"), tapi
+// state yang disimpan tetap angka mentah murni -- sama polanya kayak input
+// Nominal di TransactionTab.jsx.
+const displayPrice = (n) => (n === '' || n === null || n === undefined ? '' : Number(n).toLocaleString('id-ID'));
+const parsePriceInput = (value) => value.replace(/\D/g, '');
 
 export function ScanReceiptModal({ onClose, onSaved }) {
   // step: 'upload' | 'loading' | 'review' | 'saving'
@@ -33,10 +86,11 @@ export function ScanReceiptModal({ onClose, onSaved }) {
     setStep('loading');
 
     try {
-      const base64 = await fileToBase64(file);
+      const compressed = await compressImage(file);
+      const base64 = await fileToBase64(compressed);
       const res = await api.post('/ai/scan-receipt', {
         image: base64,
-        mimeType: file.type || 'image/jpeg',
+        mimeType: compressed.type || 'image/jpeg',
       });
 
       const scanned = res.data?.data || [];
@@ -54,6 +108,7 @@ export function ScanReceiptModal({ onClose, onSaved }) {
           price: it.price,
           qty: it.qty,
           category: it.category,
+          type: 'EXPENSE', // default: kebanyakan struk yang di-scan itu belanja. Bisa diganti di layar review.
         }))
       );
       setStep('review');
@@ -76,6 +131,12 @@ export function ScanReceiptModal({ onClose, onSaved }) {
     setItems((prev) => prev.filter((it) => it._id !== id));
   };
 
+  // Terapkan satu tipe transaksi ke semua item sekaligus -- berguna kalau
+  // struknya ternyata rekap penjualan (Pemasukan), bukan belanja bahan baku.
+  const setAllType = (type) => {
+    setItems((prev) => prev.map((it) => ({ ...it, type })));
+  };
+
   const includedItems = items.filter((it) => it.include);
   const totalIncluded = includedItems.reduce((sum, it) => sum + Number(it.price || 0), 0);
 
@@ -84,24 +145,37 @@ export function ScanReceiptModal({ onClose, onSaved }) {
     setStep('saving');
     setError('');
 
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      // Simpan satu-satu supaya kalau salah satu gagal, sisanya tetap kekirim
-      for (const it of includedItems) {
+    const today = new Date().toISOString().split('T')[0];
+    const failedNames = [];
+
+    // Simpan satu-satu, tapi tetap lanjut ke item berikutnya kalau salah satu gagal,
+    // jadi 1 item bermasalah gak bikin item lain yang valid ikut gagal kekirim.
+    for (const it of includedItems) {
+      try {
         await api.post('/transactions', {
           name: it.name,
-          type: 'EXPENSE',
+          type: it.type || 'EXPENSE',
           category: it.category,
           price: Number(it.price) || 0,
           qty: Number(it.qty) || 1,
           date: today,
         });
+      } catch (err) {
+        console.error('Save item failed:', it.name, err);
+        failedNames.push(it.name);
       }
-      onSaved?.();
+    }
+
+    onSaved?.();
+
+    if (failedNames.length === 0) {
       onClose?.();
-    } catch (err) {
-      console.error('Save scanned items failed:', err);
-      setError('Sebagian atau semua item gagal disimpan. Cek koneksi lalu coba lagi.');
+    } else if (failedNames.length === includedItems.length) {
+      setError('Semua item gagal disimpan. Cek koneksi lalu coba lagi.');
+      setStep('review');
+    } else {
+      setError(`Item berikut gagal disimpan, sisanya sudah tersimpan: ${failedNames.join(', ')}`);
+      setItems((prev) => prev.filter((it) => failedNames.includes(it.name)));
       setStep('review');
     }
   };
@@ -202,11 +276,34 @@ export function ScanReceiptModal({ onClose, onSaved }) {
               <p className="text-xs text-slate-500">
                 Cek dulu hasil bacaan AI, edit kalau ada yang salah, lalu simpan.
               </p>
+
+              <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-100 w-fit">
+                <span className="text-[11px] font-semibold text-slate-500 pl-2 pr-1">Tipe untuk semua:</span>
+                {TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setAllType(opt.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      opt.value === 'INCOME'
+                        ? 'text-emerald-700 hover:bg-emerald-50'
+                        : 'text-rose-600 hover:bg-rose-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
               {items.map((it) => (
                 <div
                   key={it._id}
                   className={`p-3 rounded-xl border ${
-                    it.include ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'
+                    !it.include
+                      ? 'border-slate-100 bg-slate-50 opacity-60'
+                      : it.type === 'INCOME'
+                      ? 'border-emerald-100 bg-emerald-50/40'
+                      : 'border-rose-100 bg-rose-50/30'
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -216,33 +313,50 @@ export function ScanReceiptModal({ onClose, onSaved }) {
                       onChange={(e) => updateItem(it._id, 'include', e.target.checked)}
                       className="mt-2 accent-emerald-600"
                     />
-                    <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="flex-1 grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         value={it.name}
                         onChange={(e) => updateItem(it._id, 'name', e.target.value)}
-                        className="col-span-2 px-2 py-1.5 text-sm font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        className="col-span-3 px-2 py-1.5 text-sm font-semibold rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         placeholder="Nama barang"
                       />
-                      <input
-                        type="number"
-                        value={it.price}
-                        onChange={(e) => updateItem(it._id, 'price', e.target.value)}
-                        className="px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        placeholder="Harga"
-                      />
+                      <div className="relative col-span-1">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">Rp</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={displayPrice(it.price)}
+                          onChange={(e) => updateItem(it._id, 'price', parsePriceInput(e.target.value))}
+                          className="w-full pl-7 pr-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          placeholder="Harga"
+                        />
+                      </div>
                       <input
                         type="number"
                         min={1}
                         value={it.qty}
                         onChange={(e) => updateItem(it._id, 'qty', e.target.value)}
-                        className="px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        className="col-span-1 px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                         placeholder="Qty"
                       />
                       <select
+                        value={it.type || 'EXPENSE'}
+                        onChange={(e) => updateItem(it._id, 'type', e.target.value)}
+                        className={`col-span-1 px-2 py-1.5 text-xs font-bold rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                          it.type === 'INCOME'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-rose-200 bg-rose-50 text-rose-600'
+                        }`}
+                      >
+                        {TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <select
                         value={it.category}
                         onChange={(e) => updateItem(it._id, 'category', e.target.value)}
-                        className="col-span-2 px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                        className="col-span-3 px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                       >
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>{c}</option>
