@@ -320,6 +320,72 @@ app.post('/api/v1/ai/generate', verifyToken, async (req, res) => {
   }
 });
 
+// Scan Struk/Nota -> Ekstrak item belanja jadi JSON (buat fitur Scan Struk)
+app.post('/api/v1/ai/scan-receipt', verifyToken, async (req, res) => {
+  try {
+    const { image, mimeType } = req.body;
+    if (!apiKey) throw new Error("API Key Gemini belum dikonfigurasi");
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Gambar struk tidak ditemukan' });
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.6-flash',
+      generationConfig: { responseMimeType: 'application/json' }
+    });
+
+    const prompt = `Kamu adalah asisten yang membaca struk/nota belanja bahan baku untuk UMKM F&B (kafe/warung).
+Baca gambar struk ini dan ekstrak SETIAP baris item belanja menjadi JSON array, dengan format PERSIS seperti ini:
+[
+  { "name": "Nama Barang", "price": 15000, "qty": 1, "category": "Bahan Baku" }
+]
+
+Aturan:
+- "price" adalah harga TOTAL per baris item (bukan harga satuan), berupa angka Rupiah tanpa titik/koma/simbol, tipe number.
+- "qty" adalah jumlah/kuantitas item pada baris tsb, default 1 kalau tidak tertulis jelas.
+- "category" tebak salah satu dari daftar ini saja: "Bahan Baku", "Operasional", "Minuman", "Makanan", "Lainnya". Untuk struk belanja bahan baku, defaultnya "Bahan Baku" kecuali jelas terlihat kategori lain.
+- Abaikan baris subtotal, PPN/pajak, diskon, biaya layanan, dan total keseluruhan -- hanya ambil baris item barang yang dibeli.
+- Kalau gambar tidak jelas, buram, atau bukan struk belanja, kembalikan array kosong [].
+- HANYA kembalikan JSON array mentah. Jangan tambahkan teks penjelasan atau markdown code fence apapun.`;
+
+    const result = await model.generateContent([
+      { inlineData: { data: image, mimeType: mimeType || 'image/jpeg' } },
+      { text: prompt }
+    ]);
+
+    let rawText = (result.response.text() || '').trim();
+    rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+    let items;
+    try {
+      items = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('Scan Receipt Parse Error:', parseErr, rawText);
+      return res.status(500).json({
+        success: false,
+        message: 'AI gagal membaca struk ini dengan jelas. Coba foto ulang dengan pencahayaan lebih terang.'
+      });
+    }
+
+    if (!Array.isArray(items)) items = [];
+
+    const validCategories = ['Bahan Baku', 'Operasional', 'Minuman', 'Makanan', 'Lainnya'];
+    const cleanItems = items
+      .filter((it) => it && it.name && it.price !== undefined && it.price !== null)
+      .map((it) => ({
+        name: String(it.name).trim().slice(0, 120),
+        price: Math.max(0, Math.round(Number(it.price)) || 0),
+        qty: Math.max(1, Math.round(Number(it.qty)) || 1),
+        category: validCategories.includes(it.category) ? it.category : 'Bahan Baku',
+      }));
+
+    res.json({ success: true, data: cleanItems });
+  } catch (err) {
+    console.error("Scan Receipt Error Detail:", err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan saat scan struk' });
+  }
+});
+
 // Hanya jalankan app.listen saat development lokal (bukan di lingkungan Vercel)
 if (!process.env.VERCEL) {
   app.listen(PORT, () => console.log(`Backend berjalan di port ${PORT}`));

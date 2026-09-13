@@ -1,12 +1,15 @@
 // src/components/TransactionTab.jsx
-import React from 'react';
-import { Sparkles, Trash2, Edit2, Receipt, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
+import { ScanReceiptModal } from './ScanReceiptModal';
 import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, TYPE_OPTIONS } from '../utils/transactionMeta';
 
 const DEFAULT_CATEGORY_NAMES = Object.keys(DEFAULT_CATEGORY_COLORS);
 
 export function TransactionTab({ kasir }) {
+  const [showScanModal, setShowScanModal] = useState(false);
+
   // Kategori sekarang dinamis: default (Minuman, Makanan, dll) + custom yang
   // ditambahkan user sendiri lewat dropdown. Disimpan di backend (Supabase),
   // jadi sinkron di semua device — dikelola lewat useKasir.js.
@@ -53,9 +56,18 @@ export function TransactionTab({ kasir }) {
             {kasir.editingId ? '✏️ Edit Transaksi' : '+ Input Transaksi Baru'}
           </h3>
           {!kasir.editingId && (
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-100/50">
-              <Sparkles size={11} /> AI Ready
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowScanModal(true)}
+                className="text-[10px] font-bold text-white bg-[#064E3B] hover:bg-[#053e2f] px-2.5 py-1.5 rounded-full flex items-center gap-1 transition"
+              >
+                <ScanLine size={12} /> Scan Struk
+              </button>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-100/50">
+                <Sparkles size={11} /> AI Ready
+              </span>
+            </div>
           )}
         </div>
 
@@ -293,6 +305,13 @@ export function TransactionTab({ kasir }) {
           </>
         )}
       </div>
+
+      {showScanModal && (
+        <ScanReceiptModal
+          onClose={() => setShowScanModal(false)}
+          onSaved={kasir.fetchTransactions}
+        />
+      )}
     </div>
   );
 }
