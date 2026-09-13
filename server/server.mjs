@@ -10,7 +10,7 @@ dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '15mb'}));
 app.use(cors());
 
 const PORT = process.env.PORT || 5000;
