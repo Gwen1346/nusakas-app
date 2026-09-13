@@ -288,8 +288,9 @@ function RecentTransactionsPreview({ transactions, onSeeAll }) {
   );
 }
 
-export function DashboardTab({ kasir, setActiveTab }) {
+export function DashboardTab({ kasir, setActiveTab, user }) {
   const [period, setPeriod] = useState('today');
+  const displayName = user?.storeName || user?.name || user?.username || 'Kasir';
 
   const periodTransactions = kasir.transactions.filter(t => isInPeriod(t.date, period));
 
@@ -318,7 +319,7 @@ export function DashboardTab({ kasir, setActiveTab }) {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             Live POS System
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight">Halo, Kasir 👋</h1>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight">Halo, {displayName} 👋</h1>
           <p className="text-xs text-emerald-100/80">Pantau transaksi dan performa UMKM hari ini.</p>
         </div>
         <button

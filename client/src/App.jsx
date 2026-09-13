@@ -115,7 +115,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-4 sm:p-10 overflow-y-auto">
-          {activeTab === 'dashboard' && <DashboardTab kasir={kasir} setActiveTab={setActiveTab} />}
+          {activeTab === 'dashboard' && <DashboardTab kasir={kasir} setActiveTab={setActiveTab} user={user} />}
           {activeTab === 'transaction' && <TransactionTab kasir={kasir} />}
           {activeTab === 'report' && <ReportTab kasir={kasir} />}
           {activeTab === 'ai' && <AiAdvisorTab kasir={kasir} userId={user?.id ?? user?._id ?? user?.email} />}

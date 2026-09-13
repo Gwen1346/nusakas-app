@@ -75,10 +75,16 @@ export function TransactionTab({ kasir }) {
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">Nominal (Rp)</label>
               <input
-                type="number"
-                placeholder="18000"
-                value={kasir.formPrice}
-                onChange={e => kasir.setFormPrice(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                placeholder="18.000"
+                value={kasir.formPrice ? Number(kasir.formPrice).toLocaleString('id-ID') : ''}
+                onChange={e => {
+                  // Buang semua karakter selain digit (termasuk titik pemisah ribuan
+                  // yang barusan kita tampilkan), jadi state tetap angka mentah murni.
+                  const digitsOnly = e.target.value.replace(/\D/g, '');
+                  kasir.setFormPrice(digitsOnly);
+                }}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 required
               />
