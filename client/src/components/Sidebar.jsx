@@ -1,6 +1,6 @@
 // src/components/Sidebar.jsx
 import React from 'react';
-import { LayoutDashboard, Receipt, Bot, Sparkles, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Receipt, Bot, Sparkles, LogOut, X } from 'lucide-react';
 import logoPutih from '../assets/logoputih.png';
 
 export function Sidebar({ activeTab, setActiveTab, setIsMobileSidebarOpen, onOpenLogoutModal }) {
@@ -48,6 +48,20 @@ export function Sidebar({ activeTab, setActiveTab, setIsMobileSidebarOpen, onOpe
             }`}
           >
             <LayoutDashboard size={18} /> Dashboard
+          </button>
+
+          <button 
+            onClick={() => { 
+              setActiveTab('transaction'); 
+              if(setIsMobileSidebarOpen) setIsMobileSidebarOpen(false); 
+            }} 
+            className={`flex items-center gap-3 w-full px-4 py-3 font-semibold rounded-xl text-sm transition ${
+              activeTab === 'transaction' 
+                ? 'bg-emerald-50 text-emerald-600 shadow-xs' 
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <PlusCircle size={18} /> Catat Transaksi
           </button>
 
           <button 

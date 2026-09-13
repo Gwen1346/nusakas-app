@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { LandingTab } from './components/LandingTab';
 import { DashboardTab } from './components/DashboardTab';
+import { TransactionTab } from './components/TransactionTab';
 import { ReportTab } from './components/ReportTab';
 import { AiAdvisorTab } from './components/AiAdvisorTab';
 import { Modals } from './components/Modals';
@@ -111,7 +112,8 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-4 sm:p-10 overflow-y-auto">
-          {activeTab === 'dashboard' && <DashboardTab kasir={kasir} />}
+          {activeTab === 'dashboard' && <DashboardTab kasir={kasir} setActiveTab={setActiveTab} />}
+          {activeTab === 'transaction' && <TransactionTab kasir={kasir} />}
           {activeTab === 'report' && <ReportTab kasir={kasir} />}
           {activeTab === 'ai' && <AiAdvisorTab kasir={kasir} />}
         </main>

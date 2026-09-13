@@ -20,6 +20,7 @@ export function useKasir() {
 
   // State Edit ID
   const [editingId, setEditingId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State pencarian & filter tabel dashboard
   const [tableSearch, setTableSearch] = useState('');
@@ -77,6 +78,9 @@ export function useKasir() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!formName || !formPrice) return;
+    if (isSubmitting) return; // cegah submit dobel kalau somehow ke-trigger 2x
+
+    setIsSubmitting(true);
 
     const payload = {
       name: formName,
@@ -98,6 +102,8 @@ export function useKasir() {
     } catch (err) {
       console.error('Gagal menyimpan transaksi:', err);
       alert('Gagal menyimpan transaksi. Coba lagi ya.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -159,6 +165,7 @@ export function useKasir() {
     formType, setFormType,
     formCategory, setFormCategory,
     editingId, setEditingId,
+    isSubmitting,
     handleFormSubmit,
     handleStartEdit,
     tableSearch, setTableSearch,
