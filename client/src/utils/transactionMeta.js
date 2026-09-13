@@ -26,12 +26,23 @@ export const TYPE_OPTIONS = [
   { value: 'EXPENSE', label: 'Expense (Pengeluaran)' },
 ];
 
+// Format tanggal ke 'YYYY-MM-DD' berdasarkan kalender LOKAL (bukan UTC).
+// Jangan pakai `date.toISOString().split('T')[0]` -- itu convert ke UTC dulu,
+// jadi antara jam 00:00-06:59 WIB hasilnya bisa mundur 1 hari dari tanggal
+// kalender yang sebenarnya (karena WIB = UTC+7).
+export function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function getLast7Days() {
   const days = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const iso = d.toISOString().split('T')[0];
+    const iso = formatLocalDate(d);
     days.push({ iso, label: DAY_LABELS[d.getDay()] });
   }
   return days;

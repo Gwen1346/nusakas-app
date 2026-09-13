@@ -4,7 +4,7 @@ import api from '../services/api';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS } from '../utils/transactionMeta';
+import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, formatLocalDate } from '../utils/transactionMeta';
 
 export function useKasir() {
   // Urutkan transaksi: tanggal terbaru dulu, kalau tanggal sama urutkan
@@ -36,7 +36,7 @@ export function useKasir() {
   // State form input transaksi (Tambah & Edit)
   const [formName, setFormName] = useState('');
   const [formPrice, setFormPrice] = useState('');
-  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formDate, setFormDate] = useState(() => formatLocalDate(new Date()));
   const [formType, setFormType] = useState('INCOME');
   const [formCategory, setFormCategory] = useState('Minuman');
 
@@ -184,7 +184,7 @@ export function useKasir() {
   const resetForm = () => {
     setFormName('');
     setFormPrice('');
-    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormDate(formatLocalDate(new Date()));
     setFormType('INCOME');
     setFormCategory('Minuman');
     setEditingId(null);
