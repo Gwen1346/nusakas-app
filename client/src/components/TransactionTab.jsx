@@ -221,23 +221,25 @@ export function TransactionTab({ kasir }) {
               )}
             </div>
 
-            <div className="w-32">
-              <CustomSelect
-                value={kasir.tableFilterType || 'ALL'}
-                onChange={(v) => kasir.setTableFilterType && kasir.setTableFilterType(v)}
-                options={[{ value: 'ALL', label: 'Semua Tipe' }, ...TYPE_OPTIONS.map(o => ({ value: o.value, label: o.value === 'INCOME' ? 'Income' : 'Expense' }))]}
-              />
-            </div>
-
-            {kasir.cashierOptions.length > 0 && (
-              <div className="w-36">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex-1 sm:w-32">
                 <CustomSelect
-                  value={kasir.tableFilterCashier || 'ALL'}
-                  onChange={(v) => kasir.setTableFilterCashier && kasir.setTableFilterCashier(v)}
-                  options={[{ value: 'ALL', label: 'Semua Kasir' }, ...kasir.cashierOptions]}
+                  value={kasir.tableFilterType || 'ALL'}
+                  onChange={(v) => kasir.setTableFilterType && kasir.setTableFilterType(v)}
+                  options={[{ value: 'ALL', label: 'Semua Tipe' }, ...TYPE_OPTIONS.map(o => ({ value: o.value, label: o.value === 'INCOME' ? 'Income' : 'Expense' }))]}
                 />
               </div>
-            )}
+
+              {kasir.cashierOptions.length > 0 && (
+                <div className="flex-1 sm:w-36">
+                  <CustomSelect
+                    value={kasir.tableFilterCashier || 'ALL'}
+                    onChange={(v) => kasir.setTableFilterCashier && kasir.setTableFilterCashier(v)}
+                    options={[{ value: 'ALL', label: 'Semua Kasir' }, ...kasir.cashierOptions]}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
