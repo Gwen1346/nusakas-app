@@ -202,12 +202,12 @@ export function TransactionTab({ kasir }) {
               className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-xl text-xs flex-1 sm:w-40 focus:outline-none focus:border-emerald-500"
             />
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 w-full sm:w-auto">
               <input
                 type="date"
                 value={kasir.tableFilterDate || ''}
                 onChange={e => kasir.setTableFilterDate && kasir.setTableFilterDate(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 text-slate-600"
+                className="flex-1 sm:flex-none px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-500 text-slate-600"
                 title="Filter Tanggal"
               />
               {kasir.tableFilterDate && (
