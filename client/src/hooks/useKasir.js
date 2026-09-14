@@ -33,6 +33,16 @@ export function useKasir() {
   const [hiddenDefaults, setHiddenDefaults] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
 
+  // State daftar kasir (Split Shift/Kasir) -- daftar nama kasir milik toko ini,
+  // diambil dari backend. "Kasir aktif" cuma disimpan di localStorage per
+  // browser/device, bukan di backend, karena itu representasi "siapa yang lagi
+  // pegang device ini sekarang", bukan data milik toko secara keseluruhan.
+  const [cashiers, setCashiers] = useState([]);
+  const [isLoadingCashiers, setIsLoadingCashiers] = useState(false);
+  const [activeCashier, setActiveCashierState] = useState(() => localStorage.getItem('nusakas_active_cashier') || '');
+  const [tableFilterCashier, setTableFilterCashier] = useState('ALL');
+  const [reportFilterCashier, setReportFilterCashier] = useState('ALL');
+
   // State form input transaksi (Tambah & Edit)
   const [formName, setFormName] = useState('');
   const [formPrice, setFormPrice] = useState('');
@@ -103,11 +113,31 @@ export function useKasir() {
     }
   }, []);
 
+  // Ambil daftar kasir milik toko (user yang sedang login) dari backend
+  const fetchCashiers = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setCashiers([]);
+      return;
+    }
+    setIsLoadingCashiers(true);
+    try {
+      const res = await api.get('/cashiers');
+      setCashiers(res.data.data || []);
+    } catch (err) {
+      console.error('Gagal mengambil data kasir:', err);
+      setCashiers([]);
+    } finally {
+      setIsLoadingCashiers(false);
+    }
+  }, []);
+
   // Ambil data begitu hook pertama kali dipakai (mis. saat refresh halaman & sesi masih ada)
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
-  }, [fetchTransactions, fetchCategories]);
+    fetchCashiers();
+  }, [fetchTransactions, fetchCategories, fetchCashiers]);
 
   const hiddenDefaultNames = hiddenDefaults.map(h => h.name.toLowerCase());
 
@@ -164,6 +194,55 @@ export function useKasir() {
     }
   }, []);
 
+  // Tambah nama kasir baru (dipanggil dari dropdown "Kasir Aktif" di TransactionTab)
+  const addCashier = useCallback(async (name) => {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return null;
+
+    const alreadyExists = cashiers.some(c => c.name.toLowerCase() === trimmed.toLowerCase());
+    if (alreadyExists) return trimmed;
+
+    try {
+      const res = await api.post('/cashiers', { name: trimmed });
+      if (res.data.data && !res.data.alreadyExists) {
+        setCashiers(prev => [...prev, res.data.data]);
+      }
+      return trimmed;
+    } catch (err) {
+      console.error('Gagal menambah kasir:', err);
+      alert('Gagal menambah kasir baru. Coba lagi ya.');
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cashiers]);
+
+  // Hapus nama kasir dari daftar. Transaksi lama yang udah ke-tag nama itu
+  // TETAP nyimpen nama aslinya (gak ikut kehapus), cuma gak muncul lagi di dropdown.
+  const deleteCashier = useCallback(async (id) => {
+    try {
+      await api.delete(`/cashiers/${id}`);
+      setCashiers(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      console.error('Gagal menghapus kasir:', err);
+      alert('Gagal menghapus kasir. Coba lagi ya.');
+    }
+  }, []);
+
+  // "Kasir aktif" = siapa yang lagi pegang device ini sekarang. Disimpan di
+  // localStorage (bukan backend) supaya tetap kepilih walau halaman di-refresh,
+  // tapi independen per device -- device kasir A tetap "Budi" walau kasir B
+  // pilih namanya sendiri di device lain.
+  const setActiveCashier = (name) => {
+    setActiveCashierState(name);
+    if (name) {
+      localStorage.setItem('nusakas_active_cashier', name);
+    } else {
+      localStorage.removeItem('nusakas_active_cashier');
+    }
+  };
+
+  const cashierOptions = cashiers.map(c => ({ value: c.name, label: c.name }));
+
   // Daftar kategori siap pakai untuk CustomSelect: default (yang belum disembunyikan) + custom
   const categories = [
     ...Object.keys(DEFAULT_CATEGORY_COLORS)
@@ -203,8 +282,14 @@ export function useKasir() {
       price: Number(formPrice),
       date: formDate,
       type: formType,
-      category: formCategory
+      category: formCategory,
     };
+    // Cuma tag "kasir aktif" pas bikin transaksi BARU. Kalau lagi edit transaksi
+    // lama, jangan timpa kasir asli yang dulu nyatet -- itu riwayat shift yang
+    // penting buat pengecekan selisih kas, gak boleh berubah cuma gara-gara ada typo dibenerin.
+    if (!editingId) {
+      payload.cashier = activeCashier || null;
+    }
 
     try {
       if (editingId) {
@@ -252,12 +337,13 @@ export function useKasir() {
     const matchSearch = (item.name || '').toLowerCase().includes(reportSearch.toLowerCase()) ||
                         (item.category || '').toLowerCase().includes(reportSearch.toLowerCase());
     const matchType = reportFilterType === 'ALL' || item.type === reportFilterType;
+    const matchCashier = reportFilterCashier === 'ALL' || item.cashier === reportFilterCashier;
 
     const itemDate = new Date(item.date);
     const startMatch = reportStartDate ? itemDate >= new Date(reportStartDate) : true;
     const endMatch = reportEndDate ? itemDate <= new Date(reportEndDate) : true;
 
-    return matchSearch && matchType && startMatch && endMatch;
+    return matchSearch && matchType && matchCashier && startMatch && endMatch;
   });
 
   // Export laporan (yang sudah difilter di menu Laporan Kas) ke file Excel (.xlsx)
@@ -366,6 +452,14 @@ export function useKasir() {
     addCategory,
     hideDefaultCategory,
     deleteCategory,
+    cashiers,
+    isLoadingCashiers,
+    activeCashier, setActiveCashier,
+    cashierOptions,
+    addCashier,
+    deleteCashier,
+    tableFilterCashier, setTableFilterCashier,
+    reportFilterCashier, setReportFilterCashier,
     formName, setFormName,
     formPrice, setFormPrice,
     formDate, setFormDate,

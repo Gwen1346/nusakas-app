@@ -10,7 +10,9 @@ dotenv.config();
 const { Pool } = pkg;
 
 const app = express();
-app.use(express.json({ limit: '15mb'}));
+// Limit dinaikin dari default 100kb -> 15mb, karena endpoint scan-receipt
+// nerima gambar struk dalam bentuk base64 yang gampang beberapa MB.
+app.use(express.json({ limit: '15mb' }));
 app.use(cors());
 
 const PORT = process.env.PORT || 5000;
@@ -107,8 +109,8 @@ app.get('/api/v1/transactions', verifyToken, async (req, res) => {
 
 app.post('/api/v1/transactions', verifyToken, async (req, res) => {
   try {
-    const { name, type, category, price, qty, date } = req.body;
-    if (!name || !type || !price) {
+    const { name, type, category, price, qty, date, cashier } = req.body;
+    if (!name || !type || price === undefined || price === null || price === '') {
       return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
     }
 
@@ -116,15 +118,16 @@ app.post('/api/v1/transactions', verifyToken, async (req, res) => {
     const txDate = date || new Date().toISOString().split('T')[0];
     const txQty = Number(qty) || 1;
     const txPrice = Number(price);
+    const txCashier = (cashier || '').trim() || null;
 
     await pool.query(
-      'INSERT INTO transactions (id, userId, name, type, category, price, qty, date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [newTxId, req.user.id, name, type, category, txPrice, txQty, txDate]
+      'INSERT INTO transactions (id, userId, name, type, category, price, qty, date, cashier) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [newTxId, req.user.id, name, type, category, txPrice, txQty, txDate, txCashier]
     );
 
     res.status(201).json({
       success: true,
-      data: { id: newTxId, userId: req.user.id, name, type, category, price: txPrice, qty: txQty, date: txDate }
+      data: { id: newTxId, userId: req.user.id, name, type, category, price: txPrice, qty: txQty, date: txDate, cashier: txCashier }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Gagal menambah transaksi' });
@@ -134,7 +137,7 @@ app.post('/api/v1/transactions', verifyToken, async (req, res) => {
 app.put('/api/v1/transactions/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, category, price, qty, date } = req.body;
+    const { name, type, category, price, qty, date, cashier } = req.body;
 
     const check = await pool.query('SELECT * FROM transactions WHERE id = $1 AND userId = $2', [id, req.user.id]);
     if (check.rows.length === 0) {
@@ -148,13 +151,14 @@ app.put('/api/v1/transactions/:id', verifyToken, async (req, res) => {
     const updatedPrice = price !== undefined ? Number(price) : current.price;
     const updatedQty = qty !== undefined ? Number(qty) : current.qty;
     const updatedDate = date ?? current.date;
+    const updatedCashier = cashier !== undefined ? ((cashier || '').trim() || null) : current.cashier;
 
     await pool.query(
-      'UPDATE transactions SET name = $1, type = $2, category = $3, price = $4, qty = $5, date = $6 WHERE id = $7 AND userId = $8',
-      [updatedName, updatedType, updatedCategory, updatedPrice, updatedQty, updatedDate, id, req.user.id]
+      'UPDATE transactions SET name = $1, type = $2, category = $3, price = $4, qty = $5, date = $6, cashier = $7 WHERE id = $8 AND userId = $9',
+      [updatedName, updatedType, updatedCategory, updatedPrice, updatedQty, updatedDate, updatedCashier, id, req.user.id]
     );
 
-    res.json({ success: true, data: { id: Number(id), userId: req.user.id, name: updatedName, type: updatedType, category: updatedCategory, price: updatedPrice, qty: updatedQty, date: updatedDate } });
+    res.json({ success: true, data: { id: Number(id), userId: req.user.id, name: updatedName, type: updatedType, category: updatedCategory, price: updatedPrice, qty: updatedQty, date: updatedDate, cashier: updatedCashier } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Gagal mengubah transaksi' });
   }
@@ -282,6 +286,65 @@ app.delete('/api/v1/categories/:id', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Delete Category Error:', error);
     res.status(500).json({ success: false, message: 'Gagal menghapus kategori' });
+  }
+});
+
+// ================= CASHIER ENDPOINTS (Split Shift/Kasir) =================
+// Tabel `cashiers` cuma nyimpen DAFTAR NAMA kasir per toko (per userId) -- ini
+// BUKAN akun login terpisah. Dipakai buat nge-tag "siapa yang bertugas" di tiap
+// transaksi, jadi kalau ada selisih kas gampang dilacak itu transaksi shift siapa.
+
+app.get('/api/v1/cashiers', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM cashiers WHERE userId = $1 ORDER BY createdAt ASC',
+      [req.user.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Cashiers Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data kasir' });
+  }
+});
+
+app.post('/api/v1/cashiers', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ success: false, message: 'Nama kasir tidak boleh kosong' });
+    }
+
+    const existing = await pool.query(
+      'SELECT * FROM cashiers WHERE userId = $1 AND LOWER(name) = LOWER($2)',
+      [req.user.id, trimmed]
+    );
+    if (existing.rows.length > 0) {
+      // Sudah ada -> anggap sukses (idempotent), biar frontend tetap bisa langsung pilih nama ini
+      return res.status(200).json({ success: true, data: existing.rows[0], alreadyExists: true });
+    }
+
+    const newId = Date.now();
+    await pool.query(
+      'INSERT INTO cashiers (id, userId, name) VALUES ($1, $2, $3)',
+      [newId, req.user.id, trimmed]
+    );
+
+    res.status(201).json({ success: true, data: { id: newId, userId: req.user.id, name: trimmed } });
+  } catch (error) {
+    console.error('Add Cashier Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menambah kasir' });
+  }
+});
+
+app.delete('/api/v1/cashiers/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM cashiers WHERE id = $1 AND userId = $2', [id, req.user.id]);
+    res.json({ success: true, message: 'Kasir berhasil dihapus' });
+  } catch (error) {
+    console.error('Delete Cashier Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menghapus kasir' });
   }
 });
 

@@ -35,7 +35,8 @@ export function TransactionTab({ kasir }) {
                         (item.category || '').toLowerCase().includes(searchVal);
     const matchType = kasir.tableFilterType === 'ALL' || !kasir.tableFilterType || item.type === kasir.tableFilterType;
     const matchDate = !kasir.tableFilterDate || item.date === kasir.tableFilterDate;
-    return matchSearch && matchType && matchDate;
+    const matchCashier = kasir.tableFilterCashier === 'ALL' || !kasir.tableFilterCashier || item.cashier === kasir.tableFilterCashier;
+    return matchSearch && matchType && matchDate && matchCashier;
   });
 
   return (
@@ -72,6 +73,30 @@ export function TransactionTab({ kasir }) {
         </div>
 
         <form onSubmit={kasir.handleFormSubmit} className="space-y-3.5">
+          {/* Kasir Aktif -- "siapa yang lagi pegang device ini sekarang". Dipilih sekali
+              di awal shift, otomatis nge-tag semua transaksi yang diinput selama itu. */}
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 border border-slate-200/60 rounded-xl">
+            <span className="text-[11px] font-bold text-slate-500 shrink-0">Kasir Bertugas:</span>
+            <div className="flex-1 min-w-[160px]">
+              <CustomSelect
+                value={kasir.activeCashier}
+                onChange={kasir.setActiveCashier}
+                options={kasir.cashierOptions}
+                onAddNew={kasir.addCashier}
+                onDeleteOption={(name) => {
+                  const row = kasir.cashiers.find(c => c.name === name);
+                  if (row) kasir.deleteCashier(row.id);
+                  if (kasir.activeCashier === name) kasir.setActiveCashier('');
+                }}
+              />
+            </div>
+            {!kasir.activeCashier && (
+              <span className="text-[10px] text-amber-600 font-semibold shrink-0">
+                Belum ada kasir dipilih
+              </span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">Nama Transaksi</label>
@@ -202,6 +227,16 @@ export function TransactionTab({ kasir }) {
                 options={[{ value: 'ALL', label: 'Semua Tipe' }, ...TYPE_OPTIONS.map(o => ({ value: o.value, label: o.value === 'INCOME' ? 'Income' : 'Expense' }))]}
               />
             </div>
+
+            {kasir.cashierOptions.length > 0 && (
+              <div className="w-36">
+                <CustomSelect
+                  value={kasir.tableFilterCashier || 'ALL'}
+                  onChange={(v) => kasir.setTableFilterCashier && kasir.setTableFilterCashier(v)}
+                  options={[{ value: 'ALL', label: 'Semua Kasir' }, ...kasir.cashierOptions]}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -227,6 +262,9 @@ export function TransactionTab({ kasir }) {
                         {item.category}
                       </span>
                       <span className="text-[10px] text-slate-400 font-medium">{item.date || '-'}</span>
+                      {item.cashier && (
+                        <span className="text-[10px] text-slate-400 font-medium">· {item.cashier}</span>
+                      )}
                     </div>
                     <div className="font-bold text-slate-800 text-xs truncate">{item.name}</div>
                     <div className={`font-black text-xs ${item.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -262,6 +300,7 @@ export function TransactionTab({ kasir }) {
                     <th className="pb-3 pr-4">Tanggal</th>
                     <th className="pb-3 pr-4">Nama</th>
                     <th className="pb-3 pr-4">Kategori</th>
+                    <th className="pb-3 pr-4">Kasir</th>
                     <th className="pb-3 pr-4">Tipe</th>
                     <th className="pb-3 pr-4">Nominal</th>
                     <th className="pb-3 text-center">Aksi</th>
@@ -273,6 +312,7 @@ export function TransactionTab({ kasir }) {
                       <td className="py-3.5 pr-4 text-xs text-slate-400 whitespace-nowrap">{item.date || '-'}</td>
                       <td className="py-3.5 pr-4 font-bold text-slate-800 text-sm max-w-[220px] truncate">{item.name}</td>
                       <td className="py-3.5 pr-4 text-xs text-slate-500 whitespace-nowrap">{item.category}</td>
+                      <td className="py-3.5 pr-4 text-xs text-slate-400 whitespace-nowrap">{item.cashier || '-'}</td>
                       <td className="py-3.5 pr-4 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold ${item.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                           {item.type}
