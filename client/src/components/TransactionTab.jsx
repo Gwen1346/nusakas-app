@@ -83,6 +83,7 @@ export function TransactionTab({ kasir }) {
                 onChange={kasir.setActiveCashier}
                 options={kasir.cashierOptions}
                 onAddNew={kasir.addCashier}
+                addLabel="kasir"
                 onDeleteOption={(name) => {
                   const row = kasir.cashiers.find(c => c.name === name);
                   if (row) kasir.deleteCashier(row.id);

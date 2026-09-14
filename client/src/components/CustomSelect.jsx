@@ -12,7 +12,10 @@ import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, FALLBACK_COLOR } from '../u
 //   opsi "+ Tambah kategori baru" di paling bawah.
 // - prop `onDeleteOption` (opsional): kalau diisi function, tiap opsi dapat ikon "x"
 //   kecil buat dihapus/disembunyikan (dipakai untuk kategori, termasuk yang default).
-export function CustomSelect({ value, onChange, options, label, colored, categoryColors, onAddNew, onDeleteOption }) {
+// - prop `addLabel` (opsional, default "kategori"): kata benda yang dipakai di teks
+//   "+ Tambah ___ baru" / placeholder / konfirmasi hapus, biar komponen ini bisa
+//   dipakai ulang buat dropdown lain (misal "kasir") tanpa teksnya nyangkut "kategori".
+export function CustomSelect({ value, onChange, options, label, colored, categoryColors, onAddNew, onDeleteOption, addLabel = 'kategori' }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newValue, setNewValue] = useState('');
@@ -100,7 +103,7 @@ export function CustomSelect({ value, onChange, options, label, colored, categor
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm(`Hapus kategori "${opt.label}" dari daftar?`)) {
+                      if (window.confirm(`Hapus ${addLabel} "${opt.label}" dari daftar?`)) {
                         onDeleteOption(opt.value);
                       }
                     }}
@@ -127,7 +130,7 @@ export function CustomSelect({ value, onChange, options, label, colored, categor
                       if (e.key === 'Enter') { e.preventDefault(); handleAddNew(); }
                       if (e.key === 'Escape') { setAdding(false); setNewValue(''); }
                     }}
-                    placeholder="Nama kategori baru"
+                    placeholder={`Nama ${addLabel} baru`}
                     className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200/60 rounded-lg text-xs font-medium focus:outline-none focus:border-emerald-500"
                   />
                   <button
@@ -144,7 +147,7 @@ export function CustomSelect({ value, onChange, options, label, colored, categor
                   onClick={() => setAdding(true)}
                   className="w-full flex items-center gap-1.5 px-1.5 py-2 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50/60 rounded-lg transition"
                 >
-                  <Plus size={13} /> Tambah kategori baru
+                  <Plus size={13} /> Tambah {addLabel} baru
                 </button>
               )}
             </div>
