@@ -275,6 +275,14 @@ export function useKasir() {
     if (!formName || !formPrice) return;
     if (isSubmitting) return; // cegah submit dobel kalau somehow ke-trigger 2x
 
+    // Wajib pilih kasir bertugas dulu sebelum bisa nyimpen transaksi BARU.
+    // Transaksi lama yang lagi diedit boleh disimpan tanpa ini (kasir asli
+    // yang udah nyatet dulu tetap dipertahankan, lihat catatan di bawah).
+    if (!editingId && !activeCashier) {
+      alert('Pilih kasir bertugas terlebih dahulu sebelum menyimpan transaksi.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {

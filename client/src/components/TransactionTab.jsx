@@ -1,13 +1,13 @@
 // src/components/TransactionTab.jsx
 import React, { useState } from 'react';
-import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine } from 'lucide-react';
+import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine, UserCheck } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 import { ScanReceiptModal } from './ScanReceiptModal';
 import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, TYPE_OPTIONS } from '../utils/transactionMeta';
 
 const DEFAULT_CATEGORY_NAMES = Object.keys(DEFAULT_CATEGORY_COLORS);
 
-export function TransactionTab({ kasir }) {
+export function TransactionTab({ kasir, setActiveTab }) {
   const [showScanModal, setShowScanModal] = useState(false);
 
   // Kategori sekarang dinamis: default (Minuman, Makanan, dll) + custom yang
@@ -73,28 +73,31 @@ export function TransactionTab({ kasir }) {
         </div>
 
         <form onSubmit={kasir.handleFormSubmit} className="space-y-3.5">
-          {/* Kasir Aktif -- "siapa yang lagi pegang device ini sekarang". Dipilih sekali
-              di awal shift, otomatis nge-tag semua transaksi yang diinput selama itu. */}
-          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 border border-slate-200/60 rounded-xl">
-            <span className="text-[11px] font-bold text-slate-500 shrink-0">Kasir Bertugas:</span>
-            <div className="flex-1 min-w-[160px]">
-              <CustomSelect
-                value={kasir.activeCashier}
-                onChange={kasir.setActiveCashier}
-                options={kasir.cashierOptions}
-                onAddNew={kasir.addCashier}
-                addLabel="kasir"
-                onDeleteOption={(name) => {
-                  const row = kasir.cashiers.find(c => c.name === name);
-                  if (row) kasir.deleteCashier(row.id);
-                  if (kasir.activeCashier === name) kasir.setActiveCashier('');
-                }}
-              />
+          {/* Kasir Aktif -- SENGAJA dikunci (read-only) di halaman ini. Ganti kasir
+              aktif cuma boleh lewat halaman Manajemen Kasir (tombol "Jadikan Aktif"),
+              biar nggak kepencet/kegeser nggak sengaja pas lagi buru-buru nyatet transaksi. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200/60 rounded-xl">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-500 shrink-0">Kasir Bertugas:</span>
+              {kasir.activeCashier ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                  <UserCheck size={12} /> {kasir.activeCashier}
+                </span>
+              ) : (
+                <span className="text-[10px] text-amber-600 font-semibold">
+                  {kasir.cashierOptions.length === 0 ? 'Belum ada kasir terdaftar' : 'Belum ada kasir dipilih'}
+                </span>
+              )}
             </div>
-            {!kasir.activeCashier && (
-              <span className="text-[10px] text-amber-600 font-semibold shrink-0">
-                Belum ada kasir dipilih
-              </span>
+            {setActiveTab && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('cashiers')}
+                className="text-[10px] font-bold text-slate-500 hover:text-emerald-700 bg-white hover:bg-emerald-50 border border-slate-200/70 hover:border-emerald-200 px-2.5 py-1.5 rounded-full flex items-center gap-1 transition shrink-0"
+              >
+                <UserCheck size={11} />
+                {kasir.activeCashier ? 'Ganti Kasir' : 'Pilih Kasir'}
+              </button>
             )}
           </div>
 

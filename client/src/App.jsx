@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { LandingTab } from './components/LandingTab';
 import { DashboardTab } from './components/DashboardTab';
 import { TransactionTab } from './components/TransactionTab';
+import { CashierManagementTab } from './components/CashierManagementTab';
 import { ReportTab } from './components/ReportTab';
 import { AiAdvisorTab } from './components/AiAdvisorTab';
 import { Modals } from './components/Modals';
@@ -116,7 +117,8 @@ export default function App() {
 
         <main className="flex-1 p-4 sm:p-10 overflow-y-auto">
           {activeTab === 'dashboard' && <DashboardTab kasir={kasir} setActiveTab={setActiveTab} user={user} />}
-          {activeTab === 'transaction' && <TransactionTab kasir={kasir} />}
+          {activeTab === 'transaction' && <TransactionTab kasir={kasir} setActiveTab={setActiveTab} />}
+          {activeTab === 'cashiers' && <CashierManagementTab kasir={kasir} />}
           {activeTab === 'report' && <ReportTab kasir={kasir} />}
           {activeTab === 'ai' && <AiAdvisorTab kasir={kasir} userId={user?.id ?? user?._id ?? user?.email} />}
         </main>
