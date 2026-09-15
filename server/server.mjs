@@ -545,13 +545,15 @@ Aturan:
 // user tetap perlu sesuaikan dengan harga bahan baku di tempatnya masing-masing.
 app.post('/api/v1/ai/suggest-product-price', verifyToken, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, cost: costOverride } = req.body;
     if (!apiKey) throw new Error("API Key Gemini belum dikonfigurasi");
 
     const trimmed = (name || '').trim();
     if (!trimmed) {
       return res.status(400).json({ success: false, message: 'Nama produk wajib diisi' });
     }
+
+    const hasCostOverride = costOverride !== undefined && costOverride !== null && Number(costOverride) > 0;
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.6-flash',
@@ -568,11 +570,12 @@ PENTING: nama produk BELUM TENTU makanan/minuman. Tentukan jenis produk berdasar
 - "Kaos Polos" -> pakaian/fashion
 
 Untuk produk bernama "${trimmed}":
+${hasCostOverride ? `PENTING: user SUDAH menentukan sendiri harga modal produk ini sebesar Rp${Math.round(Number(costOverride))}. JANGAN ubah atau estimasi ulang nilai ini -- WAJIB pakai APA ADANYA sebagai "cost" di response kamu, walau menurutmu kurang/lebih tinggi dari perkiraanmu sendiri. Fokus HANYA menghitung "price" (harga jual) yang sesuai margin realistis untuk jenis produk ini berdasarkan modal Rp${Math.round(Number(costOverride))} tersebut.` : ''}
 1. Tentukan dulu jenis produknya secara harfiah (isi field "detected_type", misal "pakaian/fashion" atau "minuman F&B")
-2. Hitung "cost": estimasi harga modal per unit/porsi dalam Rupiah, mencakup SEMUA komponen biaya langsung yang relevan untuk jenis produk itu. Contoh:
+2. ${hasCostOverride ? `"cost": WAJIB persis Rp${Math.round(Number(costOverride))} (sesuai instruksi di atas, JANGAN diubah)` : `Hitung "cost": estimasi harga modal per unit/porsi dalam Rupiah, mencakup SEMUA komponen biaya langsung yang relevan untuk jenis produk itu. Contoh:
    * Makanan/minuman siap saji: bahan baku + es batu (kalau minuman dingin) + kemasan (cup/kotak/sedotan)
    * Barang dagangan/retail (sembako, pakaian, dll): harga beli/modal dari supplier atau grosir
-   * Roti/kue: bahan baku + kemasan
+   * Roti/kue: bahan baku + kemasan`}
 3. Hitung "price": estimasi harga jual dengan margin REALISTIS sesuai jenis usahanya. Acuan umum UMKM Indonesia:
    * Makanan/minuman siap saji: food cost ratio (cost/price) sekitar 28-33%
    * Sembako/kelontong: margin tipis, markup sekitar 10-20% dari modal
@@ -595,7 +598,12 @@ Balikan HANYA JSON mentah dengan format PERSIS seperti ini, tanpa markdown code 
       return res.status(500).json({ success: false, message: 'AI gagal memberi estimasi harga. Coba lagi ya.' });
     }
 
-    const cost = Math.max(0, Math.round(Number(parsed.cost)) || 0);
+    // Kalau user udah kasih modal manual, WAJIB pakai itu apa adanya -- jangan
+    // pasrah ngandelin AI patuh instruksi di prompt, paksa di kode juga biar
+    // dijamin gak pernah ketiban ganti nilai yang user udah tau pasti.
+    const cost = hasCostOverride
+      ? Math.round(Number(costOverride))
+      : Math.max(0, Math.round(Number(parsed.cost)) || 0);
     let price = Math.max(0, Math.round(Number(parsed.price)) || 0);
     const note = String(parsed.note || '').trim().slice(0, 200);
 

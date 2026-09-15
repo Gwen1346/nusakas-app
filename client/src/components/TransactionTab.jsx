@@ -117,11 +117,18 @@ export function TransactionTab({ kasir, setActiveTab }) {
     if (isSuggestingPrice) return;
     setIsSuggestingPrice(true);
     setPriceSuggestionNote('');
+    // Kalau modal udah diisi manual sama user, kirim itu ke AI sebagai patokan
+    // yang GAK BOLEH diubah -- AI cuma fokus itung harga jualnya aja. Modal yang
+    // udah user tau pasti (misal dari struk belanja) lebih akurat dari tebakan AI.
+    const existingCost = newProdCost ? Number(newProdCost) : null;
     try {
-      const suggestion = await kasir.suggestProductPrice(newProdName);
+      const suggestion = await kasir.suggestProductPrice(newProdName, existingCost);
       if (suggestion) {
         setNewProdPrice(String(suggestion.price));
-        setNewProdCost(String(suggestion.cost));
+        // Kalau user udah isi modal sendiri, JANGAN ditimpa -- tetap pakai punya user.
+        if (!existingCost) {
+          setNewProdCost(String(suggestion.cost));
+        }
         setPriceSuggestionNote(suggestion.note || '');
       }
     } finally {
@@ -383,6 +390,10 @@ export function TransactionTab({ kasir, setActiveTab }) {
                       onClick={() => {
                         setShowAddProduct(false);
                         setPriceSuggestionNote('');
+                        setNewProdName('');
+                        setNewProdPrice('');
+                        setNewProdCost('');
+                        setNewProdCategory('Minuman');
                       }}
                       disabled={isAddingProduct}
                       className="flex-1 px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px] font-bold rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed"

@@ -314,14 +314,18 @@ export function useKasir() {
   // Minta AI ngasih PERKIRAAN harga modal & harga jual buat produk baru,
   // berdasarkan nama produknya aja. Ini estimasi umum harga pasar Indonesia --
   // BUKAN harga pasti tiap daerah/toko, tetap perlu disesuaikan manual.
-  const suggestProductPrice = useCallback(async (name) => {
+  const suggestProductPrice = useCallback(async (name, existingCost) => {
     const trimmed = (name || '').trim();
     if (!trimmed) {
       alert('Ketik dulu nama produknya sebelum minta bantuan AI.');
       return null;
     }
     try {
-      const res = await api.post('/ai/suggest-product-price', { name: trimmed });
+      const payload = { name: trimmed };
+      if (existingCost) {
+        payload.cost = existingCost; // modal udah diisi manual -- AI gak boleh ubah ini
+      }
+      const res = await api.post('/ai/suggest-product-price', payload);
       return res.data.data;
     } catch (err) {
       console.error('Gagal minta estimasi harga AI:', err);
