@@ -1,8 +1,22 @@
 // src/components/ReportTab.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, FileText, Search, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Pagination } from './Pagination';
+
+const ITEMS_PER_PAGE = 10;
 
 export function ReportTab({ kasir }) {
+  // Reset ke halaman 1 tiap kali filter/pencarian laporan berubah.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [kasir.reportSearch, kasir.reportStartDate, kasir.reportEndDate, kasir.reportFilterType]);
+
+  const paginatedReportTransactions = kasir.filteredReportTransactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* Header Banner Modern */}
@@ -82,7 +96,7 @@ export function ReportTab({ kasir }) {
           <>
             {/* Tampilan Mobile: Card Modern dengan Aksen Border Samping */}
             <div className="space-y-3 sm:hidden">
-              {kasir.filteredReportTransactions.map(item => {
+              {paginatedReportTransactions.map(item => {
                 const isIncome = item.type === 'INCOME';
                 return (
                   <div 
@@ -124,7 +138,7 @@ export function ReportTab({ kasir }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {kasir.filteredReportTransactions.map(item => {
+                  {paginatedReportTransactions.map(item => {
                     const isIncome = item.type === 'INCOME';
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/60 transition group">
@@ -150,6 +164,13 @@ export function ReportTab({ kasir }) {
                 </tbody>
               </table>
             </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalItems={kasir.filteredReportTransactions.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
           </>
         )}
       </div>

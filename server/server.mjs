@@ -109,7 +109,7 @@ app.get('/api/v1/transactions', verifyToken, async (req, res) => {
 
 app.post('/api/v1/transactions', verifyToken, async (req, res) => {
   try {
-    const { name, type, category, price, qty, date, cashier } = req.body;
+    const { name, type, category, price, qty, date, cashier, cost } = req.body;
     if (!name || !type || price === undefined || price === null || price === '') {
       return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
     }
@@ -119,15 +119,16 @@ app.post('/api/v1/transactions', verifyToken, async (req, res) => {
     const txQty = Number(qty) || 1;
     const txPrice = Number(price);
     const txCashier = (cashier || '').trim() || null;
+    const txCost = Number(cost) || 0;
 
     await pool.query(
-      'INSERT INTO transactions (id, userId, name, type, category, price, qty, date, cashier) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [newTxId, req.user.id, name, type, category, txPrice, txQty, txDate, txCashier]
+      'INSERT INTO transactions (id, userId, name, type, category, price, qty, date, cashier, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      [newTxId, req.user.id, name, type, category, txPrice, txQty, txDate, txCashier, txCost]
     );
 
     res.status(201).json({
       success: true,
-      data: { id: newTxId, userId: req.user.id, name, type, category, price: txPrice, qty: txQty, date: txDate, cashier: txCashier }
+      data: { id: newTxId, userId: req.user.id, name, type, category, price: txPrice, qty: txQty, date: txDate, cashier: txCashier, cost: txCost }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Gagal menambah transaksi' });
@@ -137,7 +138,7 @@ app.post('/api/v1/transactions', verifyToken, async (req, res) => {
 app.put('/api/v1/transactions/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, category, price, qty, date, cashier } = req.body;
+    const { name, type, category, price, qty, date, cashier, cost } = req.body;
 
     const check = await pool.query('SELECT * FROM transactions WHERE id = $1 AND userId = $2', [id, req.user.id]);
     if (check.rows.length === 0) {
@@ -152,13 +153,14 @@ app.put('/api/v1/transactions/:id', verifyToken, async (req, res) => {
     const updatedQty = qty !== undefined ? Number(qty) : current.qty;
     const updatedDate = date ?? current.date;
     const updatedCashier = cashier !== undefined ? ((cashier || '').trim() || null) : current.cashier;
+    const updatedCost = cost !== undefined ? Number(cost) : current.cost;
 
     await pool.query(
-      'UPDATE transactions SET name = $1, type = $2, category = $3, price = $4, qty = $5, date = $6, cashier = $7 WHERE id = $8 AND userId = $9',
-      [updatedName, updatedType, updatedCategory, updatedPrice, updatedQty, updatedDate, updatedCashier, id, req.user.id]
+      'UPDATE transactions SET name = $1, type = $2, category = $3, price = $4, qty = $5, date = $6, cashier = $7, cost = $8 WHERE id = $9 AND userId = $10',
+      [updatedName, updatedType, updatedCategory, updatedPrice, updatedQty, updatedDate, updatedCashier, updatedCost, id, req.user.id]
     );
 
-    res.json({ success: true, data: { id: Number(id), userId: req.user.id, name: updatedName, type: updatedType, category: updatedCategory, price: updatedPrice, qty: updatedQty, date: updatedDate, cashier: updatedCashier } });
+    res.json({ success: true, data: { id: Number(id), userId: req.user.id, name: updatedName, type: updatedType, category: updatedCategory, price: updatedPrice, qty: updatedQty, date: updatedDate, cashier: updatedCashier, cost: updatedCost } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Gagal mengubah transaksi' });
   }
@@ -345,6 +347,94 @@ app.delete('/api/v1/cashiers/:id', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Delete Cashier Error:', error);
     res.status(500).json({ success: false, message: 'Gagal menghapus kasir' });
+  }
+});
+
+// ================= PRODUCT CATALOG ENDPOINTS (Katalog Produk/Menu) =================
+// Tabel `products` nyimpen daftar item tetap (menu/produk/pengeluaran rutin) per toko.
+// Ini yang dipilih kasir di halaman Catat Transaksi -- nama & harga udah fix,
+// jadi gak ada lagi typo/inkonsistensi nama transaksi.
+
+app.get('/api/v1/products', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM products WHERE userId = $1 ORDER BY createdAt ASC',
+      [req.user.id]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error('Get Products Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data katalog produk' });
+  }
+});
+
+app.post('/api/v1/products', verifyToken, async (req, res) => {
+  try {
+    const { name, type, category, price, cost } = req.body;
+    const trimmed = (name || '').trim();
+    if (!trimmed || !type || price === undefined || price === null || price === '') {
+      return res.status(400).json({ success: false, message: 'Nama, tipe, dan harga jual wajib diisi' });
+    }
+
+    const newId = Date.now();
+    const finalPrice = Number(price);
+    const finalCost = Number(cost) || 0;
+
+    await pool.query(
+      'INSERT INTO products (id, userId, name, type, category, price, cost) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [newId, req.user.id, trimmed, type, category || 'Lainnya', finalPrice, finalCost]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { id: newId, userId: req.user.id, name: trimmed, type, category: category || 'Lainnya', price: finalPrice, cost: finalCost }
+    });
+  } catch (error) {
+    console.error('Add Product Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menambah produk' });
+  }
+});
+
+app.put('/api/v1/products/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, type, category, price, cost } = req.body;
+
+    const check = await pool.query('SELECT * FROM products WHERE id = $1 AND userId = $2', [id, req.user.id]);
+    if (check.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
+    }
+
+    const current = check.rows[0];
+    const updatedName = (name ?? current.name).toString().trim();
+    const updatedType = type ?? current.type;
+    const updatedCategory = category ?? current.category;
+    const updatedPrice = price !== undefined ? Number(price) : current.price;
+    const updatedCost = cost !== undefined ? Number(cost) : current.cost;
+
+    await pool.query(
+      'UPDATE products SET name = $1, type = $2, category = $3, price = $4, cost = $5 WHERE id = $6 AND userId = $7',
+      [updatedName, updatedType, updatedCategory, updatedPrice, updatedCost, id, req.user.id]
+    );
+
+    res.json({
+      success: true,
+      data: { id: Number(id), userId: req.user.id, name: updatedName, type: updatedType, category: updatedCategory, price: updatedPrice, cost: updatedCost }
+    });
+  } catch (error) {
+    console.error('Update Product Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal mengubah produk' });
+  }
+});
+
+app.delete('/api/v1/products/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM products WHERE id = $1 AND userId = $2', [id, req.user.id]);
+    res.json({ success: true, message: 'Produk berhasil dihapus' });
+  } catch (error) {
+    console.error('Delete Product Error:', error);
+    res.status(500).json({ success: false, message: 'Gagal menghapus produk' });
   }
 });
 

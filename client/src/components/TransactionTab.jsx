@@ -1,11 +1,13 @@
 // src/components/TransactionTab.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine, UserCheck } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 import { ScanReceiptModal } from './ScanReceiptModal';
+import { Pagination } from './Pagination';
 import { CATEGORY_COLORS as DEFAULT_CATEGORY_COLORS, TYPE_OPTIONS } from '../utils/transactionMeta';
 
 const DEFAULT_CATEGORY_NAMES = Object.keys(DEFAULT_CATEGORY_COLORS);
+const ITEMS_PER_PAGE = 10;
 
 export function TransactionTab({ kasir, setActiveTab }) {
   const [showScanModal, setShowScanModal] = useState(false);
@@ -38,6 +40,18 @@ export function TransactionTab({ kasir, setActiveTab }) {
     const matchCashier = kasir.tableFilterCashier === 'ALL' || !kasir.tableFilterCashier || item.cashier === kasir.tableFilterCashier;
     return matchSearch && matchType && matchDate && matchCashier;
   });
+
+  // Reset ke halaman 1 tiap kali filter/pencarian berubah, biar gak nyangkut
+  // di halaman 5 kosong misalnya abis ganti filter yang hasilnya cuma 2 baris.
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [kasir.tableSearch, kasir.tableFilterType, kasir.tableFilterDate, kasir.tableFilterCashier]);
+
+  const paginatedList = filteredList.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="max-w-7xl mx-auto space-y-5 pb-12">
@@ -260,7 +274,7 @@ export function TransactionTab({ kasir, setActiveTab }) {
           <>
             {/* Tampilan Mobile: Card Vertikal */}
             <div className="space-y-3 sm:hidden">
-              {filteredList.map(item => (
+              {paginatedList.map(item => (
                 <div key={item.id} className="p-4 bg-slate-50/80 border border-slate-100 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -313,7 +327,7 @@ export function TransactionTab({ kasir, setActiveTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filteredList.map(item => (
+                  {paginatedList.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition">
                       <td className="py-3.5 pr-4 text-xs text-slate-400 whitespace-nowrap">{item.date || '-'}</td>
                       <td className="py-3.5 pr-4 font-bold text-slate-800 text-sm max-w-[220px] truncate">{item.name}</td>
@@ -348,6 +362,13 @@ export function TransactionTab({ kasir, setActiveTab }) {
                 </tbody>
               </table>
             </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredList.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
           </>
         )}
       </div>
