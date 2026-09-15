@@ -12,6 +12,10 @@ const ITEMS_PER_PAGE = 10;
 export function TransactionTab({ kasir, setActiveTab }) {
   const [showScanModal, setShowScanModal] = useState(false);
 
+  // Mode Income (pilih/tambah dari katalog) vs mode Manual (Expense atau lagi Edit).
+  // Dipakai di beberapa tempat buat nentuin field mana yang perlu ditampilin.
+  const isIncomeCatalogMode = kasir.formType === 'INCOME' && !kasir.editingId;
+
   // State picker katalog produk (khusus form Income baru)
   const [productSearch, setProductSearch] = useState('');
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -39,6 +43,9 @@ export function TransactionTab({ kasir, setActiveTab }) {
     }
     if (kasir.formCategory === value) {
       kasir.setFormCategory('');
+    }
+    if (newProdCategory === value) {
+      setNewProdCategory('');
     }
   };
 
@@ -339,8 +346,15 @@ export function TransactionTab({ kasir, setActiveTab }) {
                         value={newProdCategory}
                         onChange={setNewProdCategory}
                         options={categories}
+                        categoryColors={categoryColors}
+                        onAddNew={addCategory}
+                        onDeleteOption={handleDeleteCategoryOption}
+                        colored
                       />
                     </div>
+                    <p className="text-[10px] text-slate-400 sm:col-span-2 -mt-1">
+                      Jualan bukan F&amp;B (baju, sembako, dll)? Ketik nama kategori baru di kolom ini lalu pilih "Tambah" -- kategori bawaan di atas cuma contoh, bisa disesuaikan bebas.
+                    </p>
                   </div>
 
                   {priceSuggestionNote && (
@@ -413,7 +427,7 @@ export function TransactionTab({ kasir, setActiveTab }) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className={`grid grid-cols-1 gap-3.5 ${isIncomeCatalogMode ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
             <CustomSelect
               label="Tipe"
               value={kasir.formType}
@@ -428,16 +442,23 @@ export function TransactionTab({ kasir, setActiveTab }) {
               }}
               options={TYPE_OPTIONS}
             />
-            <CustomSelect
-              label="Kategori"
-              value={kasir.formCategory}
-              onChange={kasir.setFormCategory}
-              options={categories}
-              categoryColors={categoryColors}
-              onAddNew={addCategory}
-              onDeleteOption={handleDeleteCategoryOption}
-              colored
-            />
+            {!isIncomeCatalogMode && (
+              // Kategori cuma muncul buat mode Expense/Edit manual. Pas mode Income
+              // (pilih/tambah produk dari katalog), kategori udah 100% diurus di
+              // bagian "Pilih Produk dari Katalog" di atas (baik dari produk yang
+              // dipilih, atau dari dropdown kategori pas nambah produk baru) --
+              // jadi field ini gak perlu ditampilin lagi di sini sama sekali.
+              <CustomSelect
+                label="Kategori"
+                value={kasir.formCategory}
+                onChange={kasir.setFormCategory}
+                options={categories}
+                categoryColors={categoryColors}
+                onAddNew={addCategory}
+                onDeleteOption={handleDeleteCategoryOption}
+                colored
+              />
+            )}
             <div>
               <label className="block text-[11px] font-bold text-slate-500 mb-1">Tanggal</label>
               <input

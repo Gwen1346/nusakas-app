@@ -558,14 +558,30 @@ app.post('/api/v1/ai/suggest-product-price', verifyToken, async (req, res) => {
       generationConfig: { responseMimeType: 'application/json' }
     });
 
-    const prompt = `Kamu adalah konsultan harga untuk UMKM F&B (kafe/warung) di Indonesia.
-Untuk produk/menu bernama "${trimmed}", perkirakan secara wajar:
-- "cost": estimasi harga modal/bahan baku per porsi dalam Rupiah (angka bulat, tanpa titik/koma/simbol)
-- "price": estimasi harga jual per porsi dalam Rupiah dengan margin yang wajar untuk UMKM F&B (angka bulat)
-- "note": catatan singkat maksimal 1 kalimat soal asumsi bahan/porsi yang dipakai
+    const prompt = `Kamu adalah konsultan harga untuk UMKM Indonesia lintas jenis usaha -- bisa F&B (kafe/warung makan), toko sembako/kelontong, toko baju/fashion, toko roti/bakery, atau jenis UMKM lain apa saja.
+
+PENTING: nama produk BELUM TENTU makanan/minuman. Tentukan jenis produk berdasarkan MAKNA HARFIAH kata-katanya, JANGAN mengasumsikan F&B kalau gak ada indikasi jelas soal makanan/minuman di namanya. Contoh penentuan jenis produk yang BENAR:
+- "Sweater Bangkok" -> pakaian/fashion (BUKAN minuman, walau ada kata asing di namanya)
+- "Es Teh" -> minuman F&B
+- "Beras 5kg" -> sembako/kelontong
+- "Roti Tawar" -> bakery
+- "Kaos Polos" -> pakaian/fashion
+
+Untuk produk bernama "${trimmed}":
+1. Tentukan dulu jenis produknya secara harfiah (isi field "detected_type", misal "pakaian/fashion" atau "minuman F&B")
+2. Hitung "cost": estimasi harga modal per unit/porsi dalam Rupiah, mencakup SEMUA komponen biaya langsung yang relevan untuk jenis produk itu. Contoh:
+   * Makanan/minuman siap saji: bahan baku + es batu (kalau minuman dingin) + kemasan (cup/kotak/sedotan)
+   * Barang dagangan/retail (sembako, pakaian, dll): harga beli/modal dari supplier atau grosir
+   * Roti/kue: bahan baku + kemasan
+3. Hitung "price": estimasi harga jual dengan margin REALISTIS sesuai jenis usahanya. Acuan umum UMKM Indonesia:
+   * Makanan/minuman siap saji: food cost ratio (cost/price) sekitar 28-33%
+   * Sembako/kelontong: margin tipis, markup sekitar 10-20% dari modal
+   * Pakaian/fashion: markup sekitar 50-150% dari modal
+   * Roti/kue: food cost ratio sekitar 25-35%
+4. "note": maksimal 1 kalimat, sebutkan jenis produk yang diasumsikan & komponen biaya yang dihitung.
 
 Balikan HANYA JSON mentah dengan format PERSIS seperti ini, tanpa markdown code fence atau teks lain:
-{ "cost": 12000, "price": 20000, "note": "Estimasi untuk 1 porsi memakai bahan standar warung/kafe." }`;
+{ "detected_type": "pakaian/fashion", "cost": 45000, "price": 90000, "note": "Diasumsikan pakaian: harga modal dari grosir/supplier." }`;
 
     const result = await model.generateContent(prompt);
     let rawText = (result.response.text() || '').trim();
@@ -580,8 +596,15 @@ Balikan HANYA JSON mentah dengan format PERSIS seperti ini, tanpa markdown code 
     }
 
     const cost = Math.max(0, Math.round(Number(parsed.cost)) || 0);
-    const price = Math.max(0, Math.round(Number(parsed.price)) || 0);
+    let price = Math.max(0, Math.round(Number(parsed.price)) || 0);
     const note = String(parsed.note || '').trim().slice(0, 200);
+
+    // Sanity check general (BUKAN maksa rasio F&B ke semua jenis usaha, karena
+    // margin sembako/pakaian/F&B beda jauh -- cuma jaga-jaga kalau AI kasih
+    // harga jual di bawah/sama modal, yang jelas gak masuk akal buat usaha apapun.
+    if (cost > 0 && price <= cost) {
+      price = Math.round((cost * 1.3) / 500) * 500; // fallback minimal markup 30%
+    }
 
     res.json({ success: true, data: { cost, price, note } });
   } catch (err) {
