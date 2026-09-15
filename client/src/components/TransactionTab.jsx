@@ -315,23 +315,15 @@ export function TransactionTab({ kasir, setActiveTab }) {
                       onChange={e => setNewProdName(e.target.value)}
                       className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
                     />
-                    <button
-                      type="button"
-                      onClick={handleSuggestPrice}
-                      disabled={isSuggestingPrice || !newProdName.trim()}
-                      className="px-3 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 rounded-lg text-[11px] font-bold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                      title="Belum yakin harganya? Minta AI kasih perkiraan"
-                    >
-                      {isSuggestingPrice ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" /> Menghitung...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={12} /> Bantu AI Hitung Harga
-                        </>
-                      )}
-                    </button>
+                    <CustomSelect
+                      value={newProdCategory}
+                      onChange={setNewProdCategory}
+                      options={categories}
+                      categoryColors={categoryColors}
+                      onAddNew={addCategory}
+                      onDeleteOption={handleDeleteCategoryOption}
+                      colored
+                    />
                     <input
                       type="text"
                       inputMode="numeric"
@@ -348,17 +340,23 @@ export function TransactionTab({ kasir, setActiveTab }) {
                       onChange={e => setNewProdCost(e.target.value.replace(/\D/g, ''))}
                       className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
                     />
-                    <div className="sm:col-span-2">
-                      <CustomSelect
-                        value={newProdCategory}
-                        onChange={setNewProdCategory}
-                        options={categories}
-                        categoryColors={categoryColors}
-                        onAddNew={addCategory}
-                        onDeleteOption={handleDeleteCategoryOption}
-                        colored
-                      />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSuggestPrice}
+                      disabled={isSuggestingPrice || !newProdName.trim()}
+                      className="sm:col-span-2 px-3 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 rounded-lg text-[11px] font-bold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      title="Belum yakin harganya? Minta AI kasih perkiraan"
+                    >
+                      {isSuggestingPrice ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" /> Menghitung...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} /> Bantu AI Hitung Harga
+                        </>
+                      )}
+                    </button>
                     <p className="text-[10px] text-slate-400 sm:col-span-2 -mt-1">
                       Jualan bukan F&amp;B (baju, sembako, dll)? Ketik nama kategori baru di kolom ini lalu pilih "Tambah" -- kategori bawaan di atas cuma contoh, bisa disesuaikan bebas.
                     </p>
