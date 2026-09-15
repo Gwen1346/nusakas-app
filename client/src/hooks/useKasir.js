@@ -448,16 +448,23 @@ export function useKasir() {
   };
 
   // Fungsi Hapus Transaksi (sekarang benar-benar hapus dari backend)
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const confirmDelete = async () => {
     const { id } = deleteModalConfig;
+    if (isDeleting) return; // cegah klik dobel pas masih proses hapus
+    setIsDeleting(true);
     try {
       await api.delete(`/transactions/${id}`);
       setTransactions(prev => prev.filter(t => t.id !== id));
+      setDeleteModalConfig({ isOpen: false, id: null, name: '' });
     } catch (err) {
       console.error('Gagal menghapus transaksi:', err);
       alert('Gagal menghapus transaksi. Coba lagi ya.');
+      // Modal SENGAJA gak ditutup kalau gagal, biar user bisa coba lagi
+      // tanpa harus buka ulang dari tabel.
     } finally {
-      setDeleteModalConfig({ isOpen: false, id: null, name: '' });
+      setIsDeleting(false);
     }
   };
 
@@ -618,6 +625,7 @@ export function useKasir() {
     handleExportExcel, handleExportPDF,
     detailModalItem, setDetailModalItem,
     deleteModalConfig, setDeleteModalConfig,
-    confirmDelete
+    confirmDelete,
+    isDeleting
   };
 }

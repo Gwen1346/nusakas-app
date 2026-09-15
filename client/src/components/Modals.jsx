@@ -1,6 +1,6 @@
 // src/components/Modals.jsx
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 export function Modals({ kasir }) {
   if (!kasir.deleteModalConfig.isOpen) return null;
@@ -20,15 +20,23 @@ export function Modals({ kasir }) {
         <div className="flex gap-2 pt-2">
           <button 
             onClick={() => kasir.setDeleteModalConfig({ isOpen: false, id: null, name: '' })}
-            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+            disabled={kasir.isDeleting}
+            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Batal
           </button>
           <button 
             onClick={kasir.confirmDelete}
-            className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-xs transition shadow-md"
+            disabled={kasir.isDeleting}
+            className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
-            Ya, Hapus
+            {kasir.isDeleting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" /> Menghapus...
+              </>
+            ) : (
+              'Ya, Hapus'
+            )}
           </button>
         </div>
       </div>
