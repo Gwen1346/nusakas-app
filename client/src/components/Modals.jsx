@@ -31,9 +31,7 @@ export function Modals({ kasir }) {
             className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-xs transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           >
             {kasir.isDeleting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" /> Menghapus...
-              </>
+              <Loader2 size={16} className="animate-spin" />
             ) : (
               'Ya, Hapus'
             )}
