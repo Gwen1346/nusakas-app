@@ -539,6 +539,57 @@ Aturan:
   }
 });
 
+// Estimasi Harga Modal & Harga Jual produk baru (dipanggil dari form Tambah
+// Produk ke Katalog). Ini PERKIRAAN UMUM dari pengetahuan model soal harga
+// pasar rata-rata di Indonesia, BUKAN data harga real-time per daerah/toko --
+// user tetap perlu sesuaikan dengan harga bahan baku di tempatnya masing-masing.
+app.post('/api/v1/ai/suggest-product-price', verifyToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!apiKey) throw new Error("API Key Gemini belum dikonfigurasi");
+
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ success: false, message: 'Nama produk wajib diisi' });
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.6-flash',
+      generationConfig: { responseMimeType: 'application/json' }
+    });
+
+    const prompt = `Kamu adalah konsultan harga untuk UMKM F&B (kafe/warung) di Indonesia.
+Untuk produk/menu bernama "${trimmed}", perkirakan secara wajar:
+- "cost": estimasi harga modal/bahan baku per porsi dalam Rupiah (angka bulat, tanpa titik/koma/simbol)
+- "price": estimasi harga jual per porsi dalam Rupiah dengan margin yang wajar untuk UMKM F&B (angka bulat)
+- "note": catatan singkat maksimal 1 kalimat soal asumsi bahan/porsi yang dipakai
+
+Balikan HANYA JSON mentah dengan format PERSIS seperti ini, tanpa markdown code fence atau teks lain:
+{ "cost": 12000, "price": 20000, "note": "Estimasi untuk 1 porsi memakai bahan standar warung/kafe." }`;
+
+    const result = await model.generateContent(prompt);
+    let rawText = (result.response.text() || '').trim();
+    rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('Suggest Price Parse Error:', parseErr, rawText);
+      return res.status(500).json({ success: false, message: 'AI gagal memberi estimasi harga. Coba lagi ya.' });
+    }
+
+    const cost = Math.max(0, Math.round(Number(parsed.cost)) || 0);
+    const price = Math.max(0, Math.round(Number(parsed.price)) || 0);
+    const note = String(parsed.note || '').trim().slice(0, 200);
+
+    res.json({ success: true, data: { cost, price, note } });
+  } catch (err) {
+    console.error("Suggest Product Price Error Detail:", err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan saat estimasi harga' });
+  }
+});
+
 // Hanya jalankan app.listen saat development lokal (bukan di lingkungan Vercel)
 if (!process.env.VERCEL) {
   app.listen(PORT, () => console.log(`Backend berjalan di port ${PORT}`));

@@ -49,6 +49,17 @@ export function useKasir() {
   const [formDate, setFormDate] = useState(() => formatLocalDate(new Date()));
   const [formType, setFormType] = useState('INCOME');
   const [formCategory, setFormCategory] = useState('Minuman');
+  // Harga modal (cost) -- disnapshot ke transaksi saat disimpan, biar histori
+  // margin tetap akurat walau harga modal produk di katalog berubah belakangan.
+  const [formCost, setFormCost] = useState('');
+  // ID produk katalog yang lagi dipilih (kalau transaksi Income baru WAJIB
+  // pilih dari katalog). null = belum ada yang dipilih / mode manual (Expense/Edit).
+  const [formProductId, setFormProductId] = useState(null);
+
+  // State katalog produk/menu (diambil dari backend) -- dipilih kasir pas Catat
+  // Transaksi biar nama & harga selalu konsisten, gak perlu ketik manual tiap kali.
+  const [products, setProducts] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   // State Edit ID
   const [editingId, setEditingId] = useState(null);
@@ -113,6 +124,25 @@ export function useKasir() {
     }
   }, []);
 
+  // Ambil katalog produk/menu milik toko (user yang sedang login) dari backend
+  const fetchProducts = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setProducts([]);
+      return;
+    }
+    setIsLoadingProducts(true);
+    try {
+      const res = await api.get('/products');
+      setProducts(res.data.data || []);
+    } catch (err) {
+      console.error('Gagal mengambil data katalog produk:', err);
+      setProducts([]);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, []);
+
   // Ambil daftar kasir milik toko (user yang sedang login) dari backend
   const fetchCashiers = useCallback(async () => {
     const token = localStorage.getItem('token');
@@ -137,7 +167,8 @@ export function useKasir() {
     fetchTransactions();
     fetchCategories();
     fetchCashiers();
-  }, [fetchTransactions, fetchCategories, fetchCashiers]);
+    fetchProducts();
+  }, [fetchTransactions, fetchCategories, fetchCashiers, fetchProducts]);
 
   const hiddenDefaultNames = hiddenDefaults.map(h => h.name.toLowerCase());
 
@@ -228,6 +259,77 @@ export function useKasir() {
     }
   }, []);
 
+  // Tambah produk baru ke katalog (dipanggil dari Catat Transaksi saat produk
+  // belum ada di daftar, atau dari halaman kelola katalog kalau ada nanti).
+  const addProduct = useCallback(async ({ name, type, category, price, cost }) => {
+    const trimmed = (name || '').trim();
+    if (!trimmed || price === undefined || price === null || price === '') {
+      alert('Nama & harga jual produk wajib diisi.');
+      return null;
+    }
+    try {
+      const res = await api.post('/products', {
+        name: trimmed,
+        type: type || 'INCOME',
+        category,
+        price: Number(price),
+        cost: Number(cost) || 0,
+      });
+      setProducts(prev => [...prev, res.data.data]);
+      return res.data.data;
+    } catch (err) {
+      console.error('Gagal menambah produk ke katalog:', err);
+      alert('Gagal menambah produk ke katalog. Coba lagi ya.');
+      return null;
+    }
+  }, []);
+
+  // Ubah produk katalog yang sudah ada (harga jual/modal/nama/kategori).
+  // Transaksi LAMA yang udah kepakai gak ikut berubah, karena harga & cost
+  // disnapshot ke tabel transactions saat transaksi itu dibuat.
+  const updateProduct = useCallback(async (id, payload) => {
+    try {
+      const res = await api.put(`/products/${id}`, payload);
+      setProducts(prev => prev.map(p => (p.id === id ? res.data.data : p)));
+      return res.data.data;
+    } catch (err) {
+      console.error('Gagal mengubah produk katalog:', err);
+      alert('Gagal mengubah produk katalog. Coba lagi ya.');
+      return null;
+    }
+  }, []);
+
+  // Hapus produk dari katalog. Transaksi lama yang udah pernah pakai nama ini
+  // tetap aman (gak ikut kehapus), cuma gak muncul lagi di daftar pilihan.
+  const deleteProduct = useCallback(async (id) => {
+    try {
+      await api.delete(`/products/${id}`);
+      setProducts(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Gagal menghapus produk katalog:', err);
+      alert('Gagal menghapus produk katalog. Coba lagi ya.');
+    }
+  }, []);
+
+  // Minta AI ngasih PERKIRAAN harga modal & harga jual buat produk baru,
+  // berdasarkan nama produknya aja. Ini estimasi umum harga pasar Indonesia --
+  // BUKAN harga pasti tiap daerah/toko, tetap perlu disesuaikan manual.
+  const suggestProductPrice = useCallback(async (name) => {
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      alert('Ketik dulu nama produknya sebelum minta bantuan AI.');
+      return null;
+    }
+    try {
+      const res = await api.post('/ai/suggest-product-price', { name: trimmed });
+      return res.data.data;
+    } catch (err) {
+      console.error('Gagal minta estimasi harga AI:', err);
+      alert(err.response?.data?.message || 'AI gagal memberi estimasi harga. Coba lagi ya.');
+      return null;
+    }
+  }, []);
+
   // "Kasir aktif" = siapa yang lagi pegang device ini sekarang. Disimpan di
   // localStorage (bukan backend) supaya tetap kepilih walau halaman di-refresh,
   // tapi independen per device -- device kasir A tetap "Budi" walau kasir B
@@ -263,6 +365,8 @@ export function useKasir() {
   const resetForm = () => {
     setFormName('');
     setFormPrice('');
+    setFormCost('');
+    setFormProductId(null);
     setFormDate(formatLocalDate(new Date()));
     setFormType('INCOME');
     setFormCategory('Minuman');
@@ -283,11 +387,21 @@ export function useKasir() {
       return;
     }
 
+    // Transaksi Income BARU wajib dipilih dari katalog produk (biar nama &
+    // harga konsisten, gak ada lagi typo). Expense tetap bebas manual karena
+    // harga belanja bahan baku/operasional emang beda-beda tiap kali beli.
+    // Transaksi yang lagi diedit dikecualikan, biar tetap bisa dibenerin manual.
+    if (!editingId && formType === 'INCOME' && !formProductId) {
+      alert('Pilih produk dari katalog terlebih dahulu. Kalau belum ada, tambahkan dulu lewat "+ Tambah produk baru ke katalog".');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {
       name: formName,
       price: Number(formPrice),
+      cost: Number(formCost) || 0,
       date: formDate,
       type: formType,
       category: formCategory,
@@ -316,11 +430,14 @@ export function useKasir() {
     }
   };
 
-  // Trigger Masuk Mode Edit
+  // Trigger Masuk Mode Edit -- selalu manual (gak wajib pilih ulang dari
+  // katalog), karena ini cuma buat benerin transaksi lama yang udah dicatat.
   const handleStartEdit = (item) => {
     setEditingId(item.id);
     setFormName(item.name);
     setFormPrice(item.price);
+    setFormCost(item.cost || 0);
+    setFormProductId(null);
     setFormDate(item.date || new Date().toISOString().split('T')[0]);
     setFormType(item.type);
     setFormCategory(item.category);
@@ -470,9 +587,18 @@ export function useKasir() {
     reportFilterCashier, setReportFilterCashier,
     formName, setFormName,
     formPrice, setFormPrice,
+    formCost, setFormCost,
+    formProductId, setFormProductId,
     formDate, setFormDate,
     formType, setFormType,
     formCategory, setFormCategory,
+    products,
+    isLoadingProducts,
+    fetchProducts,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    suggestProductPrice,
     editingId, setEditingId,
     isSubmitting,
     handleFormSubmit,

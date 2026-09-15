@@ -1,6 +1,6 @@
 // src/components/TransactionTab.jsx
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine, UserCheck } from 'lucide-react';
+import { Sparkles, Trash2, Edit2, Receipt, Loader2, ScanLine, UserCheck, X, Plus } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
 import { ScanReceiptModal } from './ScanReceiptModal';
 import { Pagination } from './Pagination';
@@ -11,6 +11,17 @@ const ITEMS_PER_PAGE = 10;
 
 export function TransactionTab({ kasir, setActiveTab }) {
   const [showScanModal, setShowScanModal] = useState(false);
+
+  // State picker katalog produk (khusus form Income baru)
+  const [productSearch, setProductSearch] = useState('');
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProdName, setNewProdName] = useState('');
+  const [newProdPrice, setNewProdPrice] = useState('');
+  const [newProdCost, setNewProdCost] = useState('');
+  const [newProdCategory, setNewProdCategory] = useState('Minuman');
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+  const [priceSuggestionNote, setPriceSuggestionNote] = useState('');
 
   // Kategori sekarang dinamis: default (Minuman, Makanan, dll) + custom yang
   // ditambahkan user sendiri lewat dropdown. Disimpan di backend (Supabase),
@@ -28,6 +39,86 @@ export function TransactionTab({ kasir, setActiveTab }) {
     }
     if (kasir.formCategory === value) {
       kasir.setFormCategory('');
+    }
+  };
+
+  // Daftar katalog produk yang sedang difilter pencarian, buat picker Income
+  const filteredProducts = (kasir.products || []).filter(p =>
+    (p.name || '').toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  // Pilih 1 produk dari katalog -> auto-isi nama/harga/kategori/cost di form
+  const handleSelectProduct = (p) => {
+    kasir.setFormName(p.name);
+    kasir.setFormPrice(p.price);
+    kasir.setFormCategory(p.category);
+    kasir.setFormCost(p.cost || 0);
+    kasir.setFormProductId(p.id);
+  };
+
+  // Batalkan pilihan produk, balik ke mode pilih dari katalog lagi
+  const handleClearProductSelection = () => {
+    kasir.setFormProductId(null);
+    kasir.setFormName('');
+    kasir.setFormPrice('');
+    kasir.setFormCost('');
+  };
+
+  // Hapus produk dari katalog langsung dari kartu pilihannya (misal buat
+  // beresin data kembar tanpa perlu buka Supabase).
+  const handleDeleteProduct = (p) => {
+    if (!window.confirm(`Hapus "${p.name}" dari katalog?`)) return;
+    kasir.deleteProduct(p.id);
+    if (kasir.formProductId === p.id) {
+      handleClearProductSelection();
+    }
+  };
+
+  // Tambah produk baru langsung dari halaman Catat Transaksi, biar kasir gak
+  // perlu pindah halaman kalau ada menu baru yang belum ada di katalog.
+  const handleAddProduct = async () => {
+    if (isAddingProduct) return; // cegah klik dobel pas masih proses nyimpen
+    if (!newProdName.trim() || !newProdPrice) {
+      alert('Nama & harga jual produk wajib diisi.');
+      return;
+    }
+    setIsAddingProduct(true);
+    try {
+      const created = await kasir.addProduct({
+        name: newProdName,
+        type: 'INCOME',
+        category: newProdCategory,
+        price: Number(newProdPrice),
+        cost: Number(newProdCost) || 0,
+      });
+      if (created) {
+        handleSelectProduct(created);
+        setNewProdName('');
+        setNewProdPrice('');
+        setNewProdCost('');
+        setPriceSuggestionNote('');
+        setShowAddProduct(false);
+        setProductSearch('');
+      }
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  // Minta AI ngasih perkiraan harga modal & harga jual dari nama produk aja
+  const handleSuggestPrice = async () => {
+    if (isSuggestingPrice) return;
+    setIsSuggestingPrice(true);
+    setPriceSuggestionNote('');
+    try {
+      const suggestion = await kasir.suggestProductPrice(newProdName);
+      if (suggestion) {
+        setNewProdPrice(String(suggestion.price));
+        setNewProdCost(String(suggestion.cost));
+        setPriceSuggestionNote(suggestion.note || '');
+      }
+    } finally {
+      setIsSuggestingPrice(false);
     }
   };
 
@@ -75,11 +166,11 @@ export function TransactionTab({ kasir, setActiveTab }) {
               <button
                 type="button"
                 onClick={() => setShowScanModal(true)}
-                className="text-[10px] font-bold text-white bg-[#064E3B] hover:bg-[#053e2f] px-2.5 py-1.5 rounded-full flex items-center gap-1 transition"
+                className="text-[10px] font-bold text-white bg-teal-600 hover:bg-teal-700 px-2.5 py-1.5 rounded-full flex items-center gap-1 transition"
               >
                 <ScanLine size={12} /> Scan Struk
               </button>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-100/50">
+              <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full flex items-center gap-1 border border-teal-100/50">
                 <Sparkles size={11} /> AI Ready
               </span>
             </div>
@@ -115,42 +206,226 @@ export function TransactionTab({ kasir, setActiveTab }) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">Nama Transaksi</label>
-              <input
-                type="text"
-                placeholder="Contoh: Es Kopi Susu"
-                value={kasir.formName}
-                onChange={e => kasir.setFormName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                required
-              />
+          {kasir.formType === 'INCOME' && !kasir.editingId ? (
+            /* ============ MODE KATALOG (khusus Income, transaksi baru) ============
+               Wajib pilih dari katalog produk -- gak ada lagi ketik manual nama/harga,
+               biar konsisten & bisa dihitung produk terlaris. */
+            <div className="p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-slate-500">Pilih Produk dari Katalog</label>
+                {kasir.formProductId && (
+                  <button
+                    type="button"
+                    onClick={handleClearProductSelection}
+                    className="text-[10px] font-bold text-emerald-600 hover:underline"
+                  >
+                    Ganti Pilihan
+                  </button>
+                )}
+              </div>
+
+              {kasir.formProductId ? (
+                <div className="flex items-center justify-between gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs text-emerald-800 truncate">{kasir.formName}</div>
+                    <div className="text-[11px] text-emerald-600 font-bold">
+                      Rp {Number(kasir.formPrice).toLocaleString('id-ID')}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Cari produk di katalog..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+
+                  {kasir.isLoadingProducts ? (
+                    <div className="text-[11px] text-slate-400 py-3 text-center">Memuat katalog...</div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div className="text-[11px] text-slate-400 py-3 text-center">
+                      {kasir.products.length === 0
+                        ? 'Katalog masih kosong. Tambahkan produk pertama di bawah.'
+                        : 'Produk tidak ditemukan.'}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+                      {filteredProducts.map(p => (
+                        <div key={p.id} className="relative group">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectProduct(p)}
+                            className="w-full text-left p-2.5 pr-6 bg-white hover:bg-emerald-50 border border-slate-200/60 hover:border-emerald-300 rounded-xl transition"
+                          >
+                            <div className="font-bold text-[11px] text-slate-800 truncate">{p.name}</div>
+                            <div className="text-[10px] text-emerald-600 font-bold">
+                              Rp {Number(p.price).toLocaleString('id-ID')}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteProduct(p);
+                            }}
+                            title="Hapus dari katalog"
+                            className="absolute top-1.5 right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-slate-100 hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!showAddProduct ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAddProduct(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 border border-dashed border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 rounded-xl text-[11px] font-bold transition"
+                >
+                  <Plus size={13} /> Produk belum ada di katalog? Tambah baru
+                </button>
+              ) : (
+                <div className="p-3 bg-white border border-slate-200/60 rounded-xl space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nama produk"
+                      value={newProdName}
+                      onChange={e => setNewProdName(e.target.value)}
+                      className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSuggestPrice}
+                      disabled={isSuggestingPrice || !newProdName.trim()}
+                      className="px-3 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-700 rounded-lg text-[11px] font-bold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                      title="Belum yakin harganya? Minta AI kasih perkiraan"
+                    >
+                      {isSuggestingPrice ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" /> Menghitung...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={12} /> Bantu AI Hitung Harga
+                        </>
+                      )}
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Harga jual"
+                      value={newProdPrice ? Number(newProdPrice).toLocaleString('id-ID') : ''}
+                      onChange={e => setNewProdPrice(e.target.value.replace(/\D/g, ''))}
+                      className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Harga modal (opsional)"
+                      value={newProdCost ? Number(newProdCost).toLocaleString('id-ID') : ''}
+                      onChange={e => setNewProdCost(e.target.value.replace(/\D/g, ''))}
+                      className="px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <div className="sm:col-span-2">
+                      <CustomSelect
+                        value={newProdCategory}
+                        onChange={setNewProdCategory}
+                        options={categories}
+                      />
+                    </div>
+                  </div>
+
+                  {priceSuggestionNote && (
+                    <p className="text-[10px] text-teal-600 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5 leading-relaxed">
+                      ✨ {priceSuggestionNote} — ini perkiraan umum, sesuaikan lagi dengan harga bahan di tempatmu.
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAddProduct}
+                      disabled={isAddingProduct}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      {isAddingProduct ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" /> Menyimpan...
+                        </>
+                      ) : (
+                        'Simpan ke Katalog'
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddProduct(false);
+                        setPriceSuggestionNote('');
+                      }}
+                      disabled={isAddingProduct}
+                      className="flex-1 px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px] font-bold rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">Nominal (Rp)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="18.000"
-                value={kasir.formPrice ? Number(kasir.formPrice).toLocaleString('id-ID') : ''}
-                onChange={e => {
-                  // Buang semua karakter selain digit (termasuk titik pemisah ribuan
-                  // yang barusan kita tampilkan), jadi state tetap angka mentah murni.
-                  const digitsOnly = e.target.value.replace(/\D/g, '');
-                  kasir.setFormPrice(digitsOnly);
-                }}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                required
-              />
+          ) : (
+            /* ============ MODE MANUAL (Expense, atau sedang Edit transaksi lama) ============ */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">Nama Transaksi</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Beli Kopi Bubuk 1kg"
+                  value={kasir.formName}
+                  onChange={e => kasir.setFormName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">Nominal (Rp)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="18.000"
+                  value={kasir.formPrice ? Number(kasir.formPrice).toLocaleString('id-ID') : ''}
+                  onChange={e => {
+                    // Buang semua karakter selain digit (termasuk titik pemisah ribuan
+                    // yang barusan kita tampilkan), jadi state tetap angka mentah murni.
+                    const digitsOnly = e.target.value.replace(/\D/g, '');
+                    kasir.setFormPrice(digitsOnly);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200/60 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <CustomSelect
               label="Tipe"
               value={kasir.formType}
-              onChange={kasir.setFormType}
+              onChange={(v) => {
+                kasir.setFormType(v);
+                kasir.setFormProductId(null);
+                kasir.setFormName('');
+                kasir.setFormPrice('');
+                kasir.setFormCost('');
+                setProductSearch('');
+                setShowAddProduct(false);
+              }}
               options={TYPE_OPTIONS}
             />
             <CustomSelect
@@ -183,6 +458,8 @@ export function TransactionTab({ kasir, setActiveTab }) {
                   kasir.setEditingId(null);
                   kasir.setFormName('');
                   kasir.setFormPrice('');
+                  kasir.setFormCost('');
+                  kasir.setFormProductId(null);
                 }}
                 className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -197,7 +474,9 @@ export function TransactionTab({ kasir, setActiveTab }) {
               }`}
             >
               {kasir.isSubmitting ? (
-                <Loader2 size={15} className="animate-spin" />
+                <>
+                  <Loader2 size={15} className="animate-spin" /> Menyimpan...
+                </>
               ) : (
                 kasir.editingId ? 'Simpan Perubahan' : '+ Simpan Transaksi'
               )}
